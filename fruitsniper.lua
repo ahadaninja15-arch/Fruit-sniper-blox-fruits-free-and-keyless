@@ -145,14 +145,13 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- UNIVERSAL EXECUTOR REQUEST FUNCTION
-local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
+-- DELTA NATIVE REQUEST BRIDGE FOR SERVER LIST FETCHING
+local requestFunc = (syn and syn.request) or request or http_request or (fluxus and fluxus.request)
 
--- ROBUST SERVER HOPPER
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Searching safe public server..."
+    StatusLabel.Text = "Status: Fetching public servers..."
     task.wait(0.5)
     
     local Http = game:GetService("HttpService")
@@ -164,9 +163,14 @@ local function hopServer()
     local rawData = nil
     
     pcall(function()
-        if httpRequest then
-            local response = httpRequest({Url = ApiUrl, Method = "GET"})
-            rawData = response.Body
+        if requestFunc then
+            local response = requestFunc({
+                Url = ApiUrl,
+                Method = "GET"
+            })
+            if response and response.Body then
+                rawData = response.Body
+            end
         else
             rawData = game:HttpGet(ApiUrl)
         end
@@ -180,6 +184,7 @@ local function hopServer()
                 local currentP = server.playing or 12
                 local serverId = server.id
                 
+                -- Target 3-8 player servers safely
                 if currentP >= 3 and currentP <= 8 and serverId ~= game.JobId and not VisitedServers[serverId] then
                     VisitedServers[serverId] = true
                     StatusLabel.Text = "Status: Hopping to server (" .. currentP .. "/8 players)..."
@@ -197,7 +202,8 @@ local function hopServer()
         end
     end
     
-    StatusLabel.Text = "Status: Refreshing server list..."
+    -- If no target server found instantly, loop back and try refreshing again
+    StatusLabel.Text = "Status: Retrying server list..."
     task.wait(2)
     hopServer()
 end
@@ -215,7 +221,7 @@ end)
 task.spawn(function()
     local lp = game.Players.LocalPlayer
     
-    -- DIRECT RELIABLE MARINE JOINER (Blox Fruits Remotes & UI)
+    -- DIRECT RELIABLE MARINE JOINER
     while true do
         if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
             StatusLabel.Text = "Status: Marines verified! Scans active."
@@ -225,7 +231,6 @@ task.spawn(function()
 
         StatusLabel.Text = "Status: Joining Marines..."
         
-        -- Method 1: Blox Fruits CommF Remote
         pcall(function()
             local ReplicatedStorage = game:GetService("ReplicatedStorage")
             local remotes = ReplicatedStorage:FindFirstChild("Remotes")
@@ -237,7 +242,6 @@ task.spawn(function()
             end
         end)
 
-        -- Method 2: UI Forced Click Simulation
         pcall(function()
             local playerGui = lp:FindFirstChild("PlayerGui")
             local mainGui = playerGui and playerGui:FindFirstChild("Main")
@@ -272,14 +276,14 @@ task.spawn(function()
             local humanoid = character and character:FindFirstChild("Humanoid")
             
             if root and humanoid and humanoid.Health > 0 then
-                -- 1. DETECT & DEFEND PIRATE RAID
+                -- 1. DETECT & DEFEND ALL PIRATE/CASTLE RAID NPCS
                 local raidEnemies = {}
                 if getgenv().AutoPirateRaid then
                     local enemies = workspace:FindFirstChild("Enemies")
                     if enemies then
                         for _, enemy in pairs(enemies:GetChildren()) do
                             local name = string.lower(enemy.Name)
-                            if (string.find(name, "pirate") or string.find(name, "raid") or string.find(name, "tank") or string.find(name, "raider")) then
+                            if (string.find(name, "pirate") or string.find(name, "raid") or string.find(name, "tank") or string.find(name, "raider") or string.find(name, "crew") or string.find(name, "island") or string.find(name, "mythological")) then
                                 local hum = enemy:FindFirstChild("Humanoid")
                                 if hum and hum.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
                                     table.insert(raidEnemies, enemy)
@@ -334,6 +338,7 @@ task.spawn(function()
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
                 else
+                    -- CLEANUP FLOATING BODY VELOCITY INSTANTLY WHEN RAID ENDS
                     local bv = root:FindFirstChild("RaidHoverBV")
                     if bv then bv:Destroy() end
 

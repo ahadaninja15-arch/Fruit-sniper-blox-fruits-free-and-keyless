@@ -6,7 +6,7 @@ repeat task.wait(0.5) until game.Players.LocalPlayer and game.Players.LocalPlaye
 getgenv().FruitSniperEnabled = true
 getgenv().AutoHopEnabled = true
 getgenv().AntiAFKEnabled = true
-getgenv().AutoPirateRaid = true   -- Auto fights Castle/Pirate Raids
+getgenv().AutoPirateRaid = true   -- Auto fights Castle on the Sea (SAC) pirate raid events only
 
 -- TARGET FILTERS (Strict Matching Keys)
 local TargetFruits = {
@@ -202,7 +202,6 @@ local function hopServer()
         end
     end
     
-    -- If no target server found instantly, loop back and try refreshing again
     StatusLabel.Text = "Status: Retrying server list..."
     task.wait(2)
     hopServer()
@@ -276,17 +275,24 @@ task.spawn(function()
             local humanoid = character and character:FindFirstChild("Humanoid")
             
             if root and humanoid and humanoid.Health > 0 then
-                -- 1. DETECT & DEFEND ALL PIRATE/CASTLE RAID NPCS
+                -- 1. STRICT CASTLE ON THE SEA (SAC) PIRATE RAID DETECTOR
                 local raidEnemies = {}
                 if getgenv().AutoPirateRaid then
                     local enemies = workspace:FindFirstChild("Enemies")
                     if enemies then
                         for _, enemy in pairs(enemies:GetChildren()) do
-                            local name = string.lower(enemy.Name)
-                            if (string.find(name, "pirate") or string.find(name, "raid") or string.find(name, "tank") or string.find(name, "raider") or string.find(name, "crew") or string.find(name, "island") or string.find(name, "mythological")) then
-                                local hum = enemy:FindFirstChild("Humanoid")
-                                if hum and hum.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
-                                    table.insert(raidEnemies, enemy)
+                            local eRoot = enemy:FindFirstChild("HumanoidRootPart")
+                            local hum = enemy:FindFirstChild("Humanoid")
+                            
+                            if eRoot and hum and hum.Health > 0 then
+                                -- Check if the enemy is physically located specifically around Castle on the Sea (SAC)
+                                local distToSAC = (eRoot.Position - Vector3.new(-5053, 315, -3155)).Magnitude
+                                if distToSAC <= 350 then
+                                    local name = string.lower(enemy.Name)
+                                    -- Only target exact Castle / Sea Event pirate raid spawn titles
+                                    if string.find(name, "pirate") or string.find(name, "island boy") or string.find(name, "captain elephant") or string.find(name, "mythological pirate") then
+                                        table.insert(raidEnemies, enemy)
+                                    end
                                 end
                             end
                         end
@@ -296,7 +302,7 @@ task.spawn(function()
                 if #raidEnemies > 0 then
                     getgenv().AutoHopEnabled = false
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
-                    StatusLabel.Text = "Status: RAID ACTIVE! Stacking " .. #raidEnemies .. " NPCs..."
+                    StatusLabel.Text = "Status: SAC RAID ACTIVE! Fighting " .. #raidEnemies .. " Raiders..."
                     
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = lp:FindFirstChild("Backpack")
@@ -306,42 +312,15 @@ task.spawn(function()
                         end
                     end
 
-                    local bv = root:FindFirstChild("RaidHoverBV")
-                    if not bv then
-                        bv = Instance.new("BodyVelocity")
-                        bv.Name = "RaidHoverBV"
-                        bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-                        bv.Velocity = Vector3.new(0, 0, 0)
-                        bv.Parent = root
-                    end
-
+                    -- Move right above the first target normally without any floating body velocity locks
                     local baseTarget = raidEnemies[1]:FindFirstChild("HumanoidRootPart")
                     if baseTarget then
-                        local safeHoverPosition = CFrame.new(baseTarget.Position.X, baseTarget.Position.Y + 15, baseTarget.Position.Z)
-                        root.CFrame = safeHoverPosition
-                        
-                        local mobStackCFrame = safeHoverPosition * CFrame.new(0, -10, 0)
-                        for _, enemy in pairs(raidEnemies) do
-                            pcall(function()
-                                local eRoot = enemy:FindFirstChild("HumanoidRootPart")
-                                local eHum = enemy:FindFirstChild("Humanoid")
-                                if eRoot and eHum and eHum.Health > 0 then
-                                    for _, part in pairs(enemy:GetChildren()) do
-                                        if part:IsA("BasePart") then part.CanCollide = false end
-                                    end
-                                    eRoot.CFrame = mobStackCFrame
-                                end
-                            end)
-                        end
+                        root.CFrame = CFrame.new(baseTarget.Position.X, baseTarget.Position.Y + 6, baseTarget.Position.Z)
                     end
                     
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
                 else
-                    -- CLEANUP FLOATING BODY VELOCITY INSTANTLY WHEN RAID ENDS
-                    local bv = root:FindFirstChild("RaidHoverBV")
-                    if bv then bv:Destroy() end
-
                     -- 2. INSTANT FRUIT SCAN
                     local targetFruit = nil
                     for _, item in pairs(workspace:GetChildren()) do

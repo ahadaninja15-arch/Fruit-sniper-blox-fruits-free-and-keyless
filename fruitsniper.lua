@@ -1,34 +1,14 @@
--- Delta Executor Keyless Native Framework Patch
+-- Force script to wait completely until the core game files and your player are active
 if not game:IsLoaded() then game.Loaded:Wait() end
 repeat task.wait(1) until game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")
 
--- OVERNIGHT AFK PARAMETERS
+-- Global Automation Settings
 getgenv().FruitSniperEnabled = true
 getgenv().AutoHopEnabled = true
 getgenv().AntiAFKEnabled = true
 getgenv().AutoGachaEnabled = true
 
--- TARGET FILTERS (Strict Filtering Matches)
-local TargetFruits = {
-    ["buddha"] = true,
-    ["portal"] = true,
-    ["lightning"] = true,
-    ["pain"] = true,
-    -- Mythicals
-    ["kitsune"] = true,
-    ["dragon"] = true,
-    ["leopard"] = true,
-    ["dough"] = true,
-    ["t-rex"] = true,
-    ["mammoth"] = true,
-    ["spirit"] = true,
-    ["control"] = true,
-    ["venom"] = true,
-    ["shadow"] = true,
-    ["gravity"] = true
-}
-
--- Setup Background Visual Engine Layout Grid
+-- Setup Error-Proof Screen GUI (Utilizing CoreGui to prevent engine render crashes)
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
@@ -57,7 +37,6 @@ Title.Text = "NINJA MYTHIC & GACHA SNIPER"
 Title.TextColor3 = Color3.fromRGB(255, 215, 0)
 Title.TextSize = 13
 
--- CONTROL BUTTON
 ControlButton.Name = "ControlButton"
 ControlButton.Parent = MainFrame
 ControlButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
@@ -74,10 +53,30 @@ StatusLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
 StatusLabel.Position = UDim2.new(0.05, 0, 0.55, 0)
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 50)
 StatusLabel.Font = Enum.Font.SourceSansItalic
-StatusLabel.Text = "Status: Booting system variables..."
+StatusLabel.Text = "Status: Handling Marine team selection protocol..."
 StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
 StatusLabel.TextSize = 12
 StatusLabel.TextWrapped = true
+
+-- TARGET FILTERS (Strict Filtering Matches)
+local TargetFruits = {
+    ["buddha"] = true,
+    ["portal"] = true,
+    ["lightning"] = true,
+    ["pain"] = true,
+    -- Mythicals
+    ["kitsune"] = true,
+    ["dragon"] = true,
+    ["leopard"] = true,
+    ["dough"] = true,
+    ["t-rex"] = true,
+    ["mammoth"] = true,
+    ["spirit"] = true,
+    ["control"] = true,
+    ["venom"] = true,
+    ["shadow"] = true,
+    ["gravity"] = true
+}
 
 -- Button Click Functionality
 ControlButton.MouseButton1Click:Connect(function()
@@ -129,14 +128,21 @@ end
 
 -- Core Target Scanner & Auto-Storer Background Loop
 task.spawn(function()
-    -- Thread-Safe Auto Marine Join (FIXED: Bypasses menu crashes)
-    pcall(function()
-        if game.Players.LocalPlayer.Team == nil then
-            game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("SetTeam", "Marines")
-        end
-    end)
+    -- FIXED FORCE MARINE LOOP: Runs inside thread and safely handles trailing space remote layout
+    local joined = false
+    while not joined do
+        pcall(function()
+            if game.Players.LocalPlayer.Team == nil then
+                game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("SetTeam", "Marines ")
+                task.wait(1)
+            else
+                joined = true
+            end
+        end)
+        task.wait(0.5)
+    end
     
-    StatusLabel.Text = "Status: Joined Marines. Waiting 15s for asset load..."
+    StatusLabel.Text = "Status: Successfully joined Marines. Waiting 15s to load map..."
     task.wait(15) 
     
     while task.wait(1) do
@@ -175,7 +181,6 @@ task.spawn(function()
                     root.CFrame = targetFruit:GetModelCFrame() -- Instant Collection Teleport
                     task.wait(0.8)
                     
-                    -- FIXED: Updated game replication path to ensure storage works natively
                     StatusLabel.Text = "Status: Storing " .. targetFruit.name .. " to Inventory Chest..."
                     game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", targetFruit.name, targetFruit)
                     task.wait(3)

@@ -1,14 +1,34 @@
--- Force script to wait completely until the core game files and your player are active
+-- Delta Executor Native Script Framework
 if not game:IsLoaded() then game.Loaded:Wait() end
 repeat task.wait(1) until game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")
 
--- Global Automation Settings
+-- OVERNIGHT AFK PARAMETERS
 getgenv().FruitSniperEnabled = true
 getgenv().AutoHopEnabled = true
 getgenv().AntiAFKEnabled = true
-getgenv().AutoGachaEnabled = true
+getgenv().AutoPirateRaid = true   -- Auto fights Castle/Pirate Raids when active
 
--- Setup Error-Proof Screen GUI (Utilizing CoreGui to prevent engine render crashes)
+-- TARGET FILTERS (Strict Matching Keys)
+local TargetFruits = {
+    ["buddha"] = true,
+    ["portal"] = true,
+    ["lightning"] = true,
+    ["pain"] = true,
+    -- Mythicals
+    ["kitsune"] = true,
+    ["dragon"] = true,
+    ["leopard"] = true,
+    ["dough"] = true,
+    ["t-rex"] = true,
+    ["mammoth"] = true,
+    ["spirit"] = true,
+    ["control"] = true,
+    ["venom"] = true,
+    ["shadow"] = true,
+    ["gravity"] = true
+}
+
+-- Setup Draggable UI Framework
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
@@ -33,7 +53,7 @@ Title.Parent = MainFrame
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = "NINJA MYTHIC & GACHA SNIPER"
+Title.Text = "NINJA MYTHIC & RAID SNIPER"
 Title.TextColor3 = Color3.fromRGB(255, 215, 0)
 Title.TextSize = 13
 
@@ -53,50 +73,30 @@ StatusLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
 StatusLabel.Position = UDim2.new(0.05, 0, 0.55, 0)
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 50)
 StatusLabel.Font = Enum.Font.SourceSansItalic
-StatusLabel.Text = "Status: Handling Marine team selection protocol..."
+StatusLabel.Text = "Status: Initializing systems..."
 StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
 StatusLabel.TextSize = 12
 StatusLabel.TextWrapped = true
 
--- TARGET FILTERS (Strict Filtering Matches)
-local TargetFruits = {
-    ["buddha"] = true,
-    ["portal"] = true,
-    ["lightning"] = true,
-    ["pain"] = true,
-    -- Mythicals
-    ["kitsune"] = true,
-    ["dragon"] = true,
-    ["leopard"] = true,
-    ["dough"] = true,
-    ["t-rex"] = true,
-    ["mammoth"] = true,
-    ["spirit"] = true,
-    ["control"] = true,
-    ["venom"] = true,
-    ["shadow"] = true,
-    ["gravity"] = true
-}
-
--- Button Click Functionality
+-- Toggle System State
 ControlButton.MouseButton1Click:Connect(function()
     getgenv().FruitSniperEnabled = not getgenv().FruitSniperEnabled
     if getgenv().FruitSniperEnabled then
         getgenv().AutoHopEnabled = true
         ControlButton.Text = "SCRIPT STATUS: ACTIVE"
         ControlButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-        StatusLabel.Text = "Status: Scanning initialized..."
+        StatusLabel.Text = "Status: Active..."
         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
     else
         getgenv().AutoHopEnabled = false
         ControlButton.Text = "SCRIPT STATUS: DEACTIVATED"
         ControlButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        StatusLabel.Text = "Status: System paused by player."
+        StatusLabel.Text = "Status: Paused."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     end
 end)
 
--- Anti-AFK Engine Module (Bypasses 20-minute disconnects)
+-- Anti-AFK Engine
 local vu = game:GetService("VirtualUser")
 game.Players.LocalPlayer.Idled:Connect(function()
     if getgenv().AntiAFKEnabled then
@@ -105,93 +105,147 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- Automated Public Server Changer
+-- Server Hop Routine
 local function hopServer()
-    if not getgenv().FruitSniperEnabled then return end
+    if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Server dry. Changing servers..."
+    StatusLabel.Text = "Status: Changing server..."
     task.wait(1)
+    
     local Http = game:GetService("HttpService")
     local Teleport = game:GetService("TeleportService")
+    local ApiUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+    
     local success, result = pcall(function()
-        return Http:JSONDecode(game:HttpGet("https://roblox.com" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        return Http:JSONDecode(game:HttpGet(ApiUrl))
     end)
+    
     if success and result and result.data then
         for _, server in pairs(result.data) do
             if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                Teleport:TeleportToPlaceInstance(game.PlaceId, server.id, game.Players.LocalPlayer)
+                pcall(function()
+                    Teleport:TeleportToPlaceInstance(game.PlaceId, server.id, game.Players.LocalPlayer)
+                end)
+                task.wait(3)
                 break
             end
         end
     end
 end
 
--- Core Target Scanner & Auto-Storer Background Loop
+-- Primary Execution Thread
 task.spawn(function()
-    -- FIXED FORCE MARINE LOOP: Runs inside thread and safely handles trailing space remote layout
-    local joined = false
-    while not joined do
+    -- Join Marines Loop
+    StatusLabel.Text = "Status: Joining Marine Team..."
+    local teamJoined = false
+    local attempts = 0
+    
+    while not teamJoined and attempts < 20 do
+        attempts = attempts + 1
         pcall(function()
-            if game.Players.LocalPlayer.Team == nil then
+            if game.Players.LocalPlayer.Team == nil or game.Players.LocalPlayer.Team.Name == "Neutral" then
+                game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("SetTeam", "Marines")
                 game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("SetTeam", "Marines ")
-                task.wait(1)
             else
-                joined = true
+                teamJoined = true
             end
         end)
         task.wait(0.5)
     end
     
-    StatusLabel.Text = "Status: Successfully joined Marines. Waiting 15s to load map..."
-    task.wait(15) 
+    StatusLabel.Text = "Status: Joined Marines. Loading assets..."
+    task.wait(8) 
     
-    while task.wait(1) do
+    while task.wait(0.5) do
         if getgenv().FruitSniperEnabled then
             local character = game.Players.LocalPlayer.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             
             if root then
-                -- AUTO GACHA ROLL AND STORE
-                if getgenv().AutoGachaEnabled then
-                    pcall(function()
-                        game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("GachaFruit")
-                    end)
-                end
-
-                -- DISCOVER AND INSPECT MAP FRUITS
-                local targetFruit = nil
-                for _, item in pairs(workspace:GetChildren()) do
-                    if string.find(string.lower(item.name), "fruit") and not item:IsA("Texture") then
-                        local localizedName = string.lower(item.name):gsub("fruit", ""):gsub("%s+", "")
-                        for target, _ in pairs(TargetFruits) do
-                            if string.find(localizedName, target) then
-                                targetFruit = item
-                                break
+                -- 1. DETECT & DEFEND PIRATE RAID
+                local raidEnemy = nil
+                if getgenv().AutoPirateRaid then
+                    local enemies = workspace:FindFirstChild("Enemies")
+                    if enemies then
+                        for _, enemy in pairs(enemies:GetChildren()) do
+                            local name = string.lower(enemy.Name)
+                            if (string.find(name, "pirate") or string.find(name, "raid") or string.find(name, "tank") or string.find(name, "raider")) then
+                                local hum = enemy:FindFirstChild("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    raidEnemy = enemy
+                                    break
+                                end
                             end
                         end
                     end
                 end
 
-                -- INTERCEPT AND STOP LOGIC
-                if targetFruit then
-                    getgenv().AutoHopEnabled = false -- Freeze Hop Sequence
-                    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
-                    StatusLabel.Text = "Status: TARGET FOUND (" .. targetFruit.name .. ")! Saving hop..."
+                if raidEnemy and raidEnemy:FindFirstChild("HumanoidRootPart") then
+                    getgenv().AutoHopEnabled = false
+                    StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
+                    StatusLabel.Text = "Status: PIRATE RAID ACTIVE! Defending..."
                     
-                    root.CFrame = targetFruit:GetModelCFrame() -- Instant Collection Teleport
-                    task.wait(0.8)
-                    
-                    StatusLabel.Text = "Status: Storing " .. targetFruit.name .. " to Inventory Chest..."
-                    game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", targetFruit.name, targetFruit)
-                    task.wait(3)
-                    
-                    getgenv().AutoHopEnabled = true
+                    local eRoot = raidEnemy:FindFirstChild("HumanoidRootPart")
+                    if eRoot and eRoot.Parent then
+                        -- Equip tool if unequipped
+                        if not character:FindFirstChildOfClass("Tool") then
+                            local backpack = game.Players.LocalPlayer:FindFirstChild("Backpack")
+                            if backpack then
+                                local tool = backpack:FindFirstChildOfClass("Tool")
+                                if tool then
+                                    character.Humanoid:EquipTool(tool)
+                                end
+                            end
+                        end
+                        
+                        -- Hover position
+                        root.CFrame = eRoot.CFrame * CFrame.new(0, 4, 0)
+                        
+                        -- Trigger attack
+                        vu:CaptureController()
+                        vu:ClickButton1(Vector2.new(0,0))
+                    end
                 else
-                    if getgenv().AutoHopEnabled then
-                        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                        StatusLabel.Text = "Status: Target fruits not found here. Preparing hop..."
-                        task.wait(2)
-                        hopServer()
+                    -- 2. SCAN GROUND FOR TARGET FRUITS
+                    local targetFruit = nil
+                    for _, item in pairs(workspace:GetChildren()) do
+                        local nameLower = string.lower(item.Name)
+                        if string.find(nameLower, "fruit") and not item:IsA("Texture") then
+                            local cleanName = nameLower:gsub("fruit", ""):gsub("%s+", "")
+                            for target, _ in pairs(TargetFruits) do
+                                if string.find(cleanName, target) then
+                                    targetFruit = item
+                                    break
+                                end
+                            end
+                        end
+                    end
+
+                    -- 3. TARGET FOUND HANDLING
+                    if targetFruit then
+                        getgenv().AutoHopEnabled = false
+                        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+                        StatusLabel.Text = "Status: TARGET FOUND (" .. targetFruit.Name .. ")!"
+                        
+                        if targetFruit:IsA("Model") then
+                            root.CFrame = targetFruit:GetPivot()
+                        elseif targetFruit:IsA("BasePart") then
+                            root.CFrame = targetFruit.CFrame
+                        end
+                        
+                        task.wait(0.8)
+                        StatusLabel.Text = "Status: Storing " .. targetFruit.Name .. "..."
+                        game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", targetFruit.Name, targetFruit)
+                        task.wait(3)
+                        getgenv().AutoHopEnabled = true
+                    else
+                        -- 4. SERVER HOP IF NO RAID OR FRUITS
+                        if getgenv().AutoHopEnabled then
+                            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                            StatusLabel.Text = "Status: Server clear. Hopping..."
+                            task.wait(1.5)
+                            hopServer()
+                        end
                     end
                 end
             end

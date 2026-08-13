@@ -110,7 +110,7 @@ local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
     StatusLabel.Text = "Status: Searching non-full server..."
-    task.wait(1)
+    task.wait(0.5)
     
     local Http = game:GetService("HttpService")
     local Teleport = game:GetService("TeleportService")
@@ -164,9 +164,9 @@ task.spawn(function()
     end
     
     StatusLabel.Text = "Status: Joined Marines. Scanning workspace..."
-    task.wait(3)
+    task.wait(2)
     
-    while task.wait(0.2) do
+    while task.wait(0.15) do
         if getgenv().FruitSniperEnabled then
             local character = game.Players.LocalPlayer.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -194,7 +194,7 @@ task.spawn(function()
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
                     StatusLabel.Text = "Status: RAID ACTIVE! Hovering over " .. #raidEnemies .. " NPCs..."
                     
-                    -- Auto Equip Tool
+                    -- Auto Equip Melee/Tool
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = game.Players.LocalPlayer:FindFirstChild("Backpack")
                         if backpack then
@@ -205,7 +205,7 @@ task.spawn(function()
                         end
                     end
 
-                    -- Freeze player in air using BodyVelocity to prevent falling
+                    -- Freeze player in air using BodyVelocity
                     local bv = root:FindFirstChild("RaidHoverBV")
                     if not bv then
                         bv = Instance.new("BodyVelocity")
@@ -221,7 +221,7 @@ task.spawn(function()
                         local safeHoverPosition = CFrame.new(baseTarget.Position.X, baseTarget.Position.Y + 15, baseTarget.Position.Z)
                         root.CFrame = safeHoverPosition
                         
-                        -- Stack all raid NPCs 10 studs directly below the player
+                        -- Stack all raid NPCs 10 studs directly below player
                         local mobStackCFrame = safeHoverPosition * CFrame.new(0, -10, 0)
                         for _, enemy in pairs(raidEnemies) do
                             pcall(function()
@@ -236,15 +236,15 @@ task.spawn(function()
                         end
                     end
                     
-                    -- Perform standard primary attack
+                    -- Attack
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
                 else
-                    -- Cleanup Hover BodyVelocity when raid ends
+                    -- CLEANUP HOVER EFFECT IMMEDIATELY
                     local bv = root:FindFirstChild("RaidHoverBV")
                     if bv then bv:Destroy() end
 
-                    -- 2. SCAN GROUND FOR TARGET FRUITS
+                    -- 2. INSTANT FRUIT SCAN (WORKSPACE & INVENTORY)
                     local targetFruit = nil
                     for _, item in pairs(workspace:GetChildren()) do
                         local nameLower = string.lower(item.Name)
@@ -259,29 +259,58 @@ task.spawn(function()
                         end
                     end
 
-                    -- 3. TARGET FOUND HANDLING
+                    -- 3. TARGET FRUIT ACQUISITION & AUTO-STORE
                     if targetFruit then
                         getgenv().AutoHopEnabled = false
                         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
                         StatusLabel.Text = "Status: TARGET FOUND (" .. targetFruit.Name .. ")!"
                         
+                        -- Teleport directly onto fruit
                         if targetFruit:IsA("Model") then
                             root.CFrame = targetFruit:GetPivot()
                         elseif targetFruit:IsA("BasePart") then
                             root.CFrame = targetFruit.CFrame
                         end
                         
-                        task.wait(0.8)
+                        task.wait(0.4)
+                        
+                        -- Check if fruit entered Backpack/Character and Equip/Open it
+                        local holdingFruit = nil
+                        for _, tool in pairs(character:GetChildren()) do
+                            if tool:IsA("Tool") and string.find(string.lower(tool.Name), "fruit") then
+                                holdingFruit = tool
+                                break
+                            end
+                        end
+                        
+                        if not holdingFruit then
+                            local backpack = game.Players.LocalPlayer:FindFirstChild("Backpack")
+                            if backpack then
+                                for _, tool in pairs(backpack:GetChildren()) do
+                                    if tool:IsA("Tool") and string.find(string.lower(tool.Name), "fruit") then
+                                        character.Humanoid:EquipTool(tool)
+                                        holdingFruit = tool
+                                        task.wait(0.3)
+                                        break
+                                    end
+                                end
+                            end
+                        end
+
                         StatusLabel.Text = "Status: Storing " .. targetFruit.Name .. "..."
-                        game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", targetFruit.Name, targetFruit)
-                        task.wait(3)
+                        
+                        -- Execute Fruit Storage Remote
+                        local fruitNameToStore = holdingFruit and holdingFruit.Name or targetFruit.Name
+                        game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
+                        
+                        task.wait(2)
                         getgenv().AutoHopEnabled = true
                     else
-                        -- 4. SERVER HOP IF NO RAID OR FRUITS
+                        -- 4. SERVER HOP IF NO RAID AND NO FRUITS
                         if getgenv().AutoHopEnabled then
                             StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                             StatusLabel.Text = "Status: Server clear. Hopping..."
-                            task.wait(1.5)
+                            task.wait(0.5)
                             hopServer()
                         end
                     end

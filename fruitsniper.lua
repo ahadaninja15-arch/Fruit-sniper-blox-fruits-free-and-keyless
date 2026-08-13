@@ -31,12 +31,14 @@ local TargetFruits = {
 -- Memory table to track and ignore bad / restricted / visited servers
 local VisitedServers = {}
 
--- Setup Draggable UI Framework
+-- Setup Draggable UI Framework with Minimize / Open Button
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
+local MinimizeButton = Instance.new("TextButton")
 local ControlButton = Instance.new("TextButton")
 local StatusLabel = Instance.new("TextLabel")
+local OpenButton = Instance.new("TextButton")
 
 ScreenGui.Name = "NinjaPremiumSniper"
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
@@ -54,11 +56,35 @@ MainFrame.Draggable = true
 Title.Name = "Title"
 Title.Parent = MainFrame
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Size = UDim2.new(1, -30, 0, 30)
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = "NINJA MYTHIC & RAID SNIPER"
+Title.Text = " NINJA MYTHIC & RAID SNIPER"
 Title.TextColor3 = Color3.fromRGB(255, 215, 0)
 Title.TextSize = 13
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Parent = MainFrame
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+MinimizeButton.Position = UDim2.new(1, -30, 0, 0)
+MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
+MinimizeButton.Font = Enum.Font.SourceSansBold
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 18
+
+OpenButton.Name = "OpenButton"
+OpenButton.Parent = ScreenGui
+OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+OpenButton.Position = UDim2.new(0.05, 0, 0.05, 0)
+OpenButton.Size = UDim2.new(0, 80, 0, 30)
+OpenButton.Font = Enum.Font.SourceSansBold
+OpenButton.Text = "OPEN UI"
+OpenButton.TextColor3 = Color3.fromRGB(255, 215, 0)
+OpenButton.TextSize = 12
+OpenButton.Visible = false
+OpenButton.Active = true
+OpenButton.Draggable = true
 
 ControlButton.Name = "ControlButton"
 ControlButton.Parent = MainFrame
@@ -80,6 +106,17 @@ StatusLabel.Text = "Status: Initializing team joiner..."
 StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
 StatusLabel.TextSize = 12
 StatusLabel.TextWrapped = true
+
+-- Minimize / Open Logic
+MinimizeButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    OpenButton.Visible = true
+end)
+
+OpenButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    OpenButton.Visible = false
+end)
 
 -- Toggle System State
 ControlButton.MouseButton1Click:Connect(function()
@@ -111,7 +148,7 @@ end)
 -- UNIVERSAL EXECUTOR REQUEST FUNCTION
 local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
 
--- FIXED SAFE SERVER HOPPER (3-8 Players Max Filter + Executor Request Bridge)
+-- ROBUST SERVER HOPPER
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
@@ -143,10 +180,9 @@ local function hopServer()
                 local currentP = server.playing or 12
                 local serverId = server.id
                 
-                -- Filter: Only join 3-8 player servers, ignoring visited or restricted targets
                 if currentP >= 3 and currentP <= 8 and serverId ~= game.JobId and not VisitedServers[serverId] then
                     VisitedServers[serverId] = true
-                    StatusLabel.Text = "Status: Hopping to server (" .. currentP .. "/12 players)..."
+                    StatusLabel.Text = "Status: Hopping to server (" .. currentP .. "/8 players)..."
                     
                     local tpSuccess = pcall(function()
                         Teleport:TeleportToPlaceInstance(game.PlaceId, serverId, game.Players.LocalPlayer)
@@ -161,13 +197,11 @@ local function hopServer()
         end
     end
     
-    -- Fallback retry if scan failed or no eligible server found
     StatusLabel.Text = "Status: Refreshing server list..."
     task.wait(2)
     hopServer()
 end
 
--- Teleport Error Catching System (Bypasses restricted server popups automatically)
 game:GetService("TeleportService").TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
     if player == game.Players.LocalPlayer then
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
@@ -181,7 +215,7 @@ end)
 task.spawn(function()
     local lp = game.Players.LocalPlayer
     
-    -- DIRECT RELIABLE MARINE JOINER
+    -- DIRECT RELIABLE MARINE JOINER (Blox Fruits Remotes & UI)
     while true do
         if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
             StatusLabel.Text = "Status: Marines verified! Scans active."
@@ -191,26 +225,33 @@ task.spawn(function()
 
         StatusLabel.Text = "Status: Joining Marines..."
         
-        -- Method 1: Remote Invoke
+        -- Method 1: Blox Fruits CommF Remote
         pcall(function()
-            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("CommF")
-            if commF then
-                commF:InvokeServer("SetTeam", "Marines")
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+            if remotes then
+                local commF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
+                if commF then
+                    commF:InvokeServer("SetTeam", "Marines")
+                end
             end
         end)
 
-        -- Method 2: UI Activation Fallback
+        -- Method 2: UI Forced Click Simulation
         pcall(function()
-            local mainGui = lp.PlayerGui:FindFirstChild("Main")
+            local playerGui = lp:FindFirstChild("PlayerGui")
+            local mainGui = playerGui and playerGui:FindFirstChild("Main")
             local chooseTeam = mainGui and mainGui:FindFirstChild("ChooseTeam")
-            if chooseTeam and chooseTeam.Visible then
-                local marineContainer = chooseTeam:FindFirstChild("Container") and chooseTeam.Container:FindFirstChild("Marines")
-                if marineContainer then
-                    for _, obj in pairs(marineContainer:GetDescendants()) do
-                        if obj:IsA("ImageButton") or obj:IsA("TextButton") then
+            if chooseTeam then
+                local container = chooseTeam:FindFirstChild("Container")
+                local marineBtn = container and container:FindFirstChild("Marines")
+                if marineBtn then
+                    local frame = marineBtn:FindFirstChild("Frame") or marineBtn
+                    for _, v in pairs(frame:GetDescendants()) do
+                        if v:IsA("TextButton") or v:IsA("ImageButton") then
                             if getconnections then
-                                for _, conn in pairs(getconnections(obj.Activated)) do conn:Fire() end
-                                for _, conn in pairs(getconnections(obj.MouseButton1Click)) do conn:Fire() end
+                                for _, conn in pairs(getconnections(v.MouseButton1Click)) do conn:Fire() end
+                                for _, conn in pairs(getconnections(v.Activated)) do conn:Fire() end
                             end
                         end
                     end
@@ -218,7 +259,7 @@ task.spawn(function()
             end
         end)
 
-        task.wait(1.5)
+        task.wait(2)
     end
     
     task.wait(1)
@@ -253,18 +294,14 @@ task.spawn(function()
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
                     StatusLabel.Text = "Status: RAID ACTIVE! Stacking " .. #raidEnemies .. " NPCs..."
                     
-                    -- Auto Equip Weapon
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = lp:FindFirstChild("Backpack")
                         if backpack then
                             local tool = backpack:FindFirstChildOfClass("Tool")
-                            if tool then
-                                humanoid:EquipTool(tool)
-                            end
+                            if tool then humanoid:EquipTool(tool) end
                         end
                     end
 
-                    -- Safe Flying BodyVelocity
                     local bv = root:FindFirstChild("RaidHoverBV")
                     if not bv then
                         bv = Instance.new("BodyVelocity")
@@ -274,24 +311,19 @@ task.spawn(function()
                         bv.Parent = root
                     end
 
-                    -- Hover Position Above Enemies
                     local baseTarget = raidEnemies[1]:FindFirstChild("HumanoidRootPart")
                     if baseTarget then
                         local safeHoverPosition = CFrame.new(baseTarget.Position.X, baseTarget.Position.Y + 15, baseTarget.Position.Z)
                         root.CFrame = safeHoverPosition
                         
-                        -- Mob Stacking directly under player
                         local mobStackCFrame = safeHoverPosition * CFrame.new(0, -10, 0)
                         for _, enemy in pairs(raidEnemies) do
                             pcall(function()
                                 local eRoot = enemy:FindFirstChild("HumanoidRootPart")
                                 local eHum = enemy:FindFirstChild("Humanoid")
                                 if eRoot and eHum and eHum.Health > 0 then
-                                    -- Corrected CanCollide handling on parts only
                                     for _, part in pairs(enemy:GetChildren()) do
-                                        if part:IsA("BasePart") then
-                                            part.CanCollide = false
-                                        end
+                                        if part:IsA("BasePart") then part.CanCollide = false end
                                     end
                                     eRoot.CFrame = mobStackCFrame
                                 end
@@ -299,11 +331,9 @@ task.spawn(function()
                         end
                     end
                     
-                    -- Attack Input Trigger
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
                 else
-                    -- Cleanup BodyVelocity when raid ends
                     local bv = root:FindFirstChild("RaidHoverBV")
                     if bv then bv:Destroy() end
 
@@ -328,7 +358,6 @@ task.spawn(function()
                         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
                         StatusLabel.Text = "Status: TARGET FOUND (" .. targetFruit.Name .. ")!"
                         
-                        -- Teleport to fruit
                         if targetFruit:IsA("Model") then
                             root.CFrame = targetFruit:GetPivot()
                         elseif targetFruit:IsA("BasePart") then
@@ -337,7 +366,6 @@ task.spawn(function()
                         
                         task.wait(0.8)
                         
-                        -- Find fruit in character/backpack and equip
                         local holdingFruit = nil
                         for _, tool in pairs(character:GetChildren()) do
                             if tool:IsA("Tool") and string.find(string.lower(tool.Name), "fruit") then
@@ -362,10 +390,11 @@ task.spawn(function()
 
                         StatusLabel.Text = "Status: Storing " .. targetFruit.Name .. "..."
                         
-                        -- Invoke Store Remote
                         local fruitNameToStore = holdingFruit and holdingFruit.Name or targetFruit.Name
                         pcall(function()
-                            game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
+                            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                            local commF = ReplicatedStorage.Remotes:FindFirstChild("CommF_") or ReplicatedStorage.Remotes:FindFirstChild("CommF")
+                            commF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
                         end)
                         
                         task.wait(2)

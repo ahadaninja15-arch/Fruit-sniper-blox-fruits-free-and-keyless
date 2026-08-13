@@ -28,6 +28,9 @@ local TargetFruits = {
     ["gravity"] = true
 }
 
+-- Memory table to track and ignore bad / restricted / visited servers
+local VisitedServers = {}
+
 -- Setup Draggable UI Framework
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
@@ -98,7 +101,6 @@ end)
 
 -- Anti-AFK Engine
 local vu = game:GetService("VirtualUser")
-local vim = game:GetService("VirtualInputManager")
 game.Players.LocalPlayer.Idled:Connect(function()
     if getgenv().AntiAFKEnabled then
         vu:CaptureController()
@@ -106,15 +108,18 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- Server Hop Routine
+-- NO-RESTRICTED SAFE SERVER HOPPER (3-8 Players Max Filter)
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Searching non-full server..."
+    StatusLabel.Text = "Status: Searching safe public server..."
     task.wait(0.5)
     
     local Http = game:GetService("HttpService")
     local Teleport = game:GetService("TeleportService")
+    
+    VisitedServers[game.JobId] = true
+    
     local ApiUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
     
     local success, result = pcall(function()
@@ -123,76 +128,75 @@ local function hopServer()
     
     if success and result and result.data then
         for _, server in pairs(result.data) do
-            if server.playing <= 10 and server.id ~= game.JobId then
-                pcall(function()
-                    Teleport:TeleportToPlaceInstance(game.PlaceId, server.id, game.Players.LocalPlayer)
+            local currentP = server.playing or 12
+            local serverId = server.id
+            
+            -- Filter: Only join 3-8 player servers, ignoring visited or restricted traps
+            if currentP >= 3 and currentP <= 8 and serverId ~= game.JobId and not VisitedServers[serverId] then
+                VisitedServers[serverId] = true
+                StatusLabel.Text = "Status: Hopping to server (" .. currentP .. "/12 players)..."
+                
+                local tpSuccess = pcall(function()
+                    Teleport:TeleportToPlaceInstance(game.PlaceId, serverId, game.Players.LocalPlayer)
                 end)
-                task.wait(3)
-                break
+                
+                if tpSuccess then
+                    task.wait(4)
+                    break
+                end
             end
         end
     end
 end
 
+-- Teleport Error Catching System (Bypasses restricted server popups automatically)
+game:GetService("TeleportService").TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+    if player == game.Players.LocalPlayer then
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        StatusLabel.Text = "Status: Restricted server hit. Retrying..."
+        task.wait(1)
+        hopServer()
+    end
+end)
+
 -- Primary Execution Thread
 task.spawn(function()
     local lp = game.Players.LocalPlayer
     
-    -- HARDWARE CLICK & REMOTE RETRY LOOP FOR MARINES
+    -- DIRECT MARINE JOINER LOOP
     while true do
         if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
-            StatusLabel.Text = "Status: Marines verified! Starting scans..."
+            StatusLabel.Text = "Status: Marines verified! Scans active."
             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
             break
         end
 
-        StatusLabel.Text = "Status: Clicking Marines..."
+        StatusLabel.Text = "Status: Joining Marines..."
         
-        -- 1. Direct CommF Remote
+        -- Method 1: Direct Remote Invoke
         pcall(function()
-            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-            local commF = remotes and remotes:FindFirstChild("CommF")
+            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("CommF")
             if commF then
                 commF:InvokeServer("SetTeam", "Marines")
             end
         end)
 
-        -- 2. Exact UI Button Element Execution
+        -- Method 2: Direct Connection Fire on Marine Frame
         pcall(function()
-            local mainGui = lp.PlayerGui:FindFirstChild("Main")
-            if mainGui then
-                local chooseTeam = mainGui:FindFirstChild("ChooseTeam")
-                if chooseTeam then
-                    local marineBtn = chooseTeam:FindFirstChild("Container") and chooseTeam.Container:FindFirstChild("Marines")
-                    if marineBtn then
-                        -- Fire connections on the actual Marine Frame/Button
-                        for _, desc in pairs(marineBtn:GetDescendants()) do
-                            if desc:IsA("TextButton") or desc:IsA("ImageButton") then
-                                for _, conn in pairs(getconnections(desc.Activated)) do conn:Fire() end
-                                for _, conn in pairs(getconnections(desc.MouseButton1Click)) do conn:Fire() end
-                            end
+            local chooseTeam = lp.PlayerGui:FindFirstChild("Main") and lp.PlayerGui.Main:FindFirstChild("ChooseTeam")
+            if chooseTeam then
+                local marineBtn = chooseTeam:FindFirstChild("Container") and chooseTeam.Container:FindFirstChild("Marines")
+                if marineBtn then
+                    for _, obj in pairs(marineBtn:GetDescendants()) do
+                        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                            for _, conn in pairs(getconnections(obj.Activated)) do conn:Fire() end
+                            for _, conn in pairs(getconnections(obj.MouseButton1Click)) do conn:Fire() end
                         end
                     end
                 end
             end
         end)
 
-        -- 3. Screen Touch Simulation (Taps exact Marines card location on screen)
-        pcall(function()
-            local camera = workspace.CurrentCamera
-            if camera then
-                local viewportSize = camera.ViewportSize
-                -- Marine box is located around 61% X, 52% Y on mobile screens
-                local tapX = viewportSize.X * 0.61
-                local tapY = viewportSize.Y * 0.52
-                
-                vim:SendMouseButtonEvent(tapX, tapY, 0, true, game, 0)
-                task.wait(0.05)
-                vim:SendMouseButtonEvent(tapX, tapY, 0, false, game, 0)
-            end
-        end)
-
-        -- Check every 3 seconds
         task.wait(3)
     end
     
@@ -342,7 +346,7 @@ task.spawn(function()
                         task.wait(2)
                         getgenv().AutoHopEnabled = true
                     else
-                        -- 4. SERVER HOP
+                        -- 4. SAFE SERVER HOP
                         if getgenv().AutoHopEnabled then
                             StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                             StatusLabel.Text = "Status: Server clear. Hopping..."

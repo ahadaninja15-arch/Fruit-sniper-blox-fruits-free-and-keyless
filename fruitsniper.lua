@@ -98,6 +98,7 @@ end)
 
 -- Anti-AFK Engine
 local vu = game:GetService("VirtualUser")
+local vim = game:GetService("VirtualInputManager")
 game.Players.LocalPlayer.Idled:Connect(function()
     if getgenv().AntiAFKEnabled then
         vu:CaptureController()
@@ -137,18 +138,17 @@ end
 task.spawn(function()
     local lp = game.Players.LocalPlayer
     
-    -- 5-SECOND RETRY LOOP FOR MARINES
+    -- HARDWARE CLICK & REMOTE RETRY LOOP FOR MARINES
     while true do
         if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
-            -- Joined successfully -> Stop clicking immediately
             StatusLabel.Text = "Status: Marines verified! Starting scans..."
             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
             break
         end
 
-        StatusLabel.Text = "Status: Attempting to join Marines (Retrying every 5s)..."
+        StatusLabel.Text = "Status: Clicking Marines..."
         
-        -- Attempt 1: Direct Remote Call
+        -- 1. Direct CommF Remote
         pcall(function()
             local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
             local commF = remotes and remotes:FindFirstChild("CommF")
@@ -157,23 +157,43 @@ task.spawn(function()
             end
         end)
 
-        -- Attempt 2: UI Click Trigger
+        -- 2. Exact UI Button Element Execution
         pcall(function()
-            for _, v in pairs(lp.PlayerGui:GetDescendants()) do
-                if v:IsA("TextButton") or v:IsA("ImageButton") then
-                    local nameLower = string.lower(v.Name)
-                    local parentNameLower = v.Parent and string.lower(v.Parent.Name) or ""
-                    if nameLower == "marines" or parentNameLower == "marines" or (v:IsA("TextButton") and string.find(string.lower(v.Text), "marine")) then
-                        for _, conn in pairs(getconnections(v.Activated)) do conn:Fire() end
-                        for _, conn in pairs(getconnections(v.MouseButton1Click)) do conn:Fire() end
-                        for _, conn in pairs(getconnections(v.MouseButton1Down)) do conn:Fire() end
+            local mainGui = lp.PlayerGui:FindFirstChild("Main")
+            if mainGui then
+                local chooseTeam = mainGui:FindFirstChild("ChooseTeam")
+                if chooseTeam then
+                    local marineBtn = chooseTeam:FindFirstChild("Container") and chooseTeam.Container:FindFirstChild("Marines")
+                    if marineBtn then
+                        -- Fire connections on the actual Marine Frame/Button
+                        for _, desc in pairs(marineBtn:GetDescendants()) do
+                            if desc:IsA("TextButton") or desc:IsA("ImageButton") then
+                                for _, conn in pairs(getconnections(desc.Activated)) do conn:Fire() end
+                                for _, conn in pairs(getconnections(desc.MouseButton1Click)) do conn:Fire() end
+                            end
+                        end
                     end
                 end
             end
         end)
 
-        -- Wait 5 seconds before checking status again
-        task.wait(5)
+        -- 3. Screen Touch Simulation (Taps exact Marines card location on screen)
+        pcall(function()
+            local camera = workspace.CurrentCamera
+            if camera then
+                local viewportSize = camera.ViewportSize
+                -- Marine box is located around 61% X, 52% Y on mobile screens
+                local tapX = viewportSize.X * 0.61
+                local tapY = viewportSize.Y * 0.52
+                
+                vim:SendMouseButtonEvent(tapX, tapY, 0, true, game, 0)
+                task.wait(0.05)
+                vim:SendMouseButtonEvent(tapX, tapY, 0, false, game, 0)
+            end
+        end)
+
+        -- Check every 3 seconds
+        task.wait(3)
     end
     
     task.wait(1)

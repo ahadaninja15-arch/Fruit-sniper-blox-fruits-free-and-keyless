@@ -1,5 +1,6 @@
 -- Delta Executor Native Script Framework
 if not game:IsLoaded() then game.Loaded:Wait() end
+task.wait(10) -- Extended 10-second wait for full game asset loading
 repeat task.wait(1) until game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")
 
 -- OVERNIGHT AFK PARAMETERS

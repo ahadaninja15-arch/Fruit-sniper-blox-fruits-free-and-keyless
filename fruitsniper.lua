@@ -108,7 +108,10 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- NO-RESTRICTED SAFE SERVER HOPPER (3-8 Players Max Filter)
+-- UNIVERSAL EXECUTOR REQUEST FUNCTION
+local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
+
+-- FIXED SAFE SERVER HOPPER (3-8 Players Max Filter + Executor Request Bridge)
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
@@ -121,32 +124,47 @@ local function hopServer()
     VisitedServers[game.JobId] = true
     
     local ApiUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+    local rawData = nil
     
-    local success, result = pcall(function()
-        return Http:JSONDecode(game:HttpGet(ApiUrl))
+    pcall(function()
+        if httpRequest then
+            local response = httpRequest({Url = ApiUrl, Method = "GET"})
+            rawData = response.Body
+        else
+            rawData = game:HttpGet(ApiUrl)
+        end
     end)
     
-    if success and result and result.data then
-        for _, server in pairs(result.data) do
-            local currentP = server.playing or 12
-            local serverId = server.id
-            
-            -- Filter: Only join 3-8 player servers, ignoring visited or restricted traps
-            if currentP >= 3 and currentP <= 8 and serverId ~= game.JobId and not VisitedServers[serverId] then
-                VisitedServers[serverId] = true
-                StatusLabel.Text = "Status: Hopping to server (" .. currentP .. "/12 players)..."
+    if rawData then
+        local success, result = pcall(function() return Http:JSONDecode(rawData) end)
+        
+        if success and result and result.data then
+            for _, server in pairs(result.data) do
+                local currentP = server.playing or 12
+                local serverId = server.id
                 
-                local tpSuccess = pcall(function()
-                    Teleport:TeleportToPlaceInstance(game.PlaceId, serverId, game.Players.LocalPlayer)
-                end)
-                
-                if tpSuccess then
-                    task.wait(4)
-                    break
+                -- Filter: Only join 3-8 player servers, ignoring visited or restricted targets
+                if currentP >= 3 and currentP <= 8 and serverId ~= game.JobId and not VisitedServers[serverId] then
+                    VisitedServers[serverId] = true
+                    StatusLabel.Text = "Status: Hopping to server (" .. currentP .. "/12 players)..."
+                    
+                    local tpSuccess = pcall(function()
+                        Teleport:TeleportToPlaceInstance(game.PlaceId, serverId, game.Players.LocalPlayer)
+                    end)
+                    
+                    if tpSuccess then
+                        task.wait(4)
+                        return
+                    end
                 end
             end
         end
     end
+    
+    -- Fallback retry if scan failed or no eligible server found
+    StatusLabel.Text = "Status: Refreshing server list..."
+    task.wait(2)
+    hopServer()
 end
 
 -- Teleport Error Catching System (Bypasses restricted server popups automatically)
@@ -163,7 +181,7 @@ end)
 task.spawn(function()
     local lp = game.Players.LocalPlayer
     
-    -- DIRECT MARINE JOINER LOOP
+    -- DIRECT RELIABLE MARINE JOINER
     while true do
         if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
             StatusLabel.Text = "Status: Marines verified! Scans active."
@@ -173,7 +191,7 @@ task.spawn(function()
 
         StatusLabel.Text = "Status: Joining Marines..."
         
-        -- Method 1: Direct Remote Invoke
+        -- Method 1: Remote Invoke
         pcall(function()
             local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("CommF")
             if commF then
@@ -181,23 +199,26 @@ task.spawn(function()
             end
         end)
 
-        -- Method 2: Direct Connection Fire on Marine Frame
+        -- Method 2: UI Activation Fallback
         pcall(function()
-            local chooseTeam = lp.PlayerGui:FindFirstChild("Main") and lp.PlayerGui.Main:FindFirstChild("ChooseTeam")
-            if chooseTeam then
-                local marineBtn = chooseTeam:FindFirstChild("Container") and chooseTeam.Container:FindFirstChild("Marines")
-                if marineBtn then
-                    for _, obj in pairs(marineBtn:GetDescendants()) do
-                        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                            for _, conn in pairs(getconnections(obj.Activated)) do conn:Fire() end
-                            for _, conn in pairs(getconnections(obj.MouseButton1Click)) do conn:Fire() end
+            local mainGui = lp.PlayerGui:FindFirstChild("Main")
+            local chooseTeam = mainGui and mainGui:FindFirstChild("ChooseTeam")
+            if chooseTeam and chooseTeam.Visible then
+                local marineContainer = chooseTeam:FindFirstChild("Container") and chooseTeam.Container:FindFirstChild("Marines")
+                if marineContainer then
+                    for _, obj in pairs(marineContainer:GetDescendants()) do
+                        if obj:IsA("ImageButton") or obj:IsA("TextButton") then
+                            if getconnections then
+                                for _, conn in pairs(getconnections(obj.Activated)) do conn:Fire() end
+                                for _, conn in pairs(getconnections(obj.MouseButton1Click)) do conn:Fire() end
+                            end
                         end
                     end
                 end
             end
         end)
 
-        task.wait(3)
+        task.wait(1.5)
     end
     
     task.wait(1)
@@ -230,7 +251,7 @@ task.spawn(function()
                 if #raidEnemies > 0 then
                     getgenv().AutoHopEnabled = false
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
-                    StatusLabel.Text = "Status: RAID ACTIVE! Hovering over " .. #raidEnemies .. " NPCs..."
+                    StatusLabel.Text = "Status: RAID ACTIVE! Stacking " .. #raidEnemies .. " NPCs..."
                     
                     -- Auto Equip Weapon
                     if not character:FindFirstChildOfClass("Tool") then
@@ -266,8 +287,12 @@ task.spawn(function()
                                 local eRoot = enemy:FindFirstChild("HumanoidRootPart")
                                 local eHum = enemy:FindFirstChild("Humanoid")
                                 if eRoot and eHum and eHum.Health > 0 then
-                                    eHum.CanCollide = false
-                                    eRoot.CanCollide = false
+                                    -- Corrected CanCollide handling on parts only
+                                    for _, part in pairs(enemy:GetChildren()) do
+                                        if part:IsA("BasePart") then
+                                            part.CanCollide = false
+                                        end
+                                    end
                                     eRoot.CFrame = mobStackCFrame
                                 end
                             end)

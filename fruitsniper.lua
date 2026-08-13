@@ -133,46 +133,70 @@ local function hopServer()
     end
 end
 
+-- Fail-Safe Marine Joiner
+local function forceJoinMarines()
+    local lp = game.Players.LocalPlayer
+    if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then 
+        return true 
+    end
+
+    -- 1. Direct CommF Remote Invoke
+    pcall(function()
+        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+        local commF = remotes and remotes:FindFirstChild("CommF")
+        if commF then
+            commF:InvokeServer("SetTeam", "Marines")
+        end
+    end)
+
+    task.wait(0.5)
+    if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then 
+        return true 
+    end
+
+    -- 2. UI Click Connections Override
+    pcall(function()
+        for _, v in pairs(lp.PlayerGui:GetDescendants()) do
+            if v:IsA("TextButton") or v:IsA("ImageButton") then
+                local nameLower = string.lower(v.Name)
+                local parentNameLower = v.Parent and string.lower(v.Parent.Name) or ""
+                if nameLower == "marines" or parentNameLower == "marines" or (v:IsA("TextButton") and string.find(string.lower(v.Text), "marine")) then
+                    for _, conn in pairs(getconnections(v.Activated)) do conn:Fire() end
+                    for _, conn in pairs(getconnections(v.MouseButton1Click)) do conn:Fire() end
+                    for _, conn in pairs(getconnections(v.MouseButton1Down)) do conn:Fire() end
+                end
+            end
+        end
+    end)
+
+    task.wait(0.5)
+    return (lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine"))
+end
+
 -- Primary Execution Thread
 task.spawn(function()
-    -- Marine Team Joiner
     StatusLabel.Text = "Status: Joining Marine Team..."
-    local teamJoined = false
     local attempts = 0
     
-    while not teamJoined and attempts < 15 do
+    while attempts < 10 do
         attempts = attempts + 1
-        pcall(function()
-            local lp = game.Players.LocalPlayer
-            if lp.Team == nil or lp.Team.Name == "Neutral" then
-                game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("SetTeam", "Marines")
-                
-                local mainGui = lp.PlayerGui:FindFirstChild("Main")
-                if mainGui and mainGui:FindFirstChild("ChooseTeam") then
-                    local marineBtn = mainGui.ChooseTeam:FindFirstChild("Container") and mainGui.ChooseTeam.Container:FindFirstChild("Marines")
-                    if marineBtn and marineBtn:FindFirstChild("Frame") and marineBtn.Frame:FindFirstChild("TextButton") then
-                        for _, connection in pairs(getconnections(marineBtn.Frame.TextButton.Activated)) do
-                            connection:Fire()
-                        end
-                    end
-                end
-            else
-                teamJoined = true
-            end
-        end)
+        if forceJoinMarines() then
+            break
+        end
         task.wait(0.8)
     end
     
     StatusLabel.Text = "Status: Joined Marines. Scanning workspace..."
-    task.wait(2)
+    task.wait(1.5)
     
     while task.wait(0.15) do
         if getgenv().FruitSniperEnabled then
             local character = game.Players.LocalPlayer.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character and character:FindFirstChild("Humanoid")
             
-            if root then
-                -- 1. DETECT & DEFEND PIRATE RAID (SAFE AIR ATTACK)
+            if root and humanoid and humanoid.Health > 0 then
+                -- 1. DETECT & DEFEND PIRATE RAID
                 local raidEnemies = {}
                 if getgenv().AutoPirateRaid then
                     local enemies = workspace:FindFirstChild("Enemies")
@@ -194,18 +218,18 @@ task.spawn(function()
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
                     StatusLabel.Text = "Status: RAID ACTIVE! Hovering over " .. #raidEnemies .. " NPCs..."
                     
-                    -- Auto Equip Melee/Tool
+                    -- Auto Equip Weapon
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = game.Players.LocalPlayer:FindFirstChild("Backpack")
                         if backpack then
                             local tool = backpack:FindFirstChildOfClass("Tool")
                             if tool then
-                                character.Humanoid:EquipTool(tool)
+                                humanoid:EquipTool(tool)
                             end
                         end
                     end
 
-                    -- Freeze player in air using BodyVelocity
+                    -- Safe Flying BodyVelocity
                     local bv = root:FindFirstChild("RaidHoverBV")
                     if not bv then
                         bv = Instance.new("BodyVelocity")
@@ -215,13 +239,13 @@ task.spawn(function()
                         bv.Parent = root
                     end
 
-                    -- Hover position 15 studs above ground target
+                    -- Hover Position Above Enemies
                     local baseTarget = raidEnemies[1]:FindFirstChild("HumanoidRootPart")
                     if baseTarget then
                         local safeHoverPosition = CFrame.new(baseTarget.Position.X, baseTarget.Position.Y + 15, baseTarget.Position.Z)
                         root.CFrame = safeHoverPosition
                         
-                        -- Stack all raid NPCs 10 studs directly below player
+                        -- Mob Stacking directly under player
                         local mobStackCFrame = safeHoverPosition * CFrame.new(0, -10, 0)
                         for _, enemy in pairs(raidEnemies) do
                             pcall(function()
@@ -236,15 +260,15 @@ task.spawn(function()
                         end
                     end
                     
-                    -- Attack
+                    -- Attack Input Trigger
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
                 else
-                    -- CLEANUP HOVER EFFECT IMMEDIATELY
+                    -- Cleanup BodyVelocity when raid ends
                     local bv = root:FindFirstChild("RaidHoverBV")
                     if bv then bv:Destroy() end
 
-                    -- 2. INSTANT FRUIT SCAN (WORKSPACE & INVENTORY)
+                    -- 2. INSTANT FRUIT SCAN
                     local targetFruit = nil
                     for _, item in pairs(workspace:GetChildren()) do
                         local nameLower = string.lower(item.Name)
@@ -259,22 +283,22 @@ task.spawn(function()
                         end
                     end
 
-                    -- 3. TARGET FRUIT ACQUISITION & AUTO-STORE
+                    -- 3. FRUIT PICKUP & STORE ROUTINE
                     if targetFruit then
                         getgenv().AutoHopEnabled = false
                         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
                         StatusLabel.Text = "Status: TARGET FOUND (" .. targetFruit.Name .. ")!"
                         
-                        -- Teleport directly onto fruit
+                        -- Teleport to fruit
                         if targetFruit:IsA("Model") then
                             root.CFrame = targetFruit:GetPivot()
                         elseif targetFruit:IsA("BasePart") then
                             root.CFrame = targetFruit.CFrame
                         end
                         
-                        task.wait(0.4)
+                        task.wait(0.8)
                         
-                        -- Check if fruit entered Backpack/Character and Equip/Open it
+                        -- Find fruit in character/backpack and equip
                         local holdingFruit = nil
                         for _, tool in pairs(character:GetChildren()) do
                             if tool:IsA("Tool") and string.find(string.lower(tool.Name), "fruit") then
@@ -288,9 +312,9 @@ task.spawn(function()
                             if backpack then
                                 for _, tool in pairs(backpack:GetChildren()) do
                                     if tool:IsA("Tool") and string.find(string.lower(tool.Name), "fruit") then
-                                        character.Humanoid:EquipTool(tool)
+                                        humanoid:EquipTool(tool)
                                         holdingFruit = tool
-                                        task.wait(0.3)
+                                        task.wait(0.4)
                                         break
                                     end
                                 end
@@ -299,14 +323,16 @@ task.spawn(function()
 
                         StatusLabel.Text = "Status: Storing " .. targetFruit.Name .. "..."
                         
-                        -- Execute Fruit Storage Remote
+                        -- Invoke Store Remote
                         local fruitNameToStore = holdingFruit and holdingFruit.Name or targetFruit.Name
-                        game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
+                        pcall(function()
+                            game:GetService("ReplicatedStorage").Remotes.CommF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
+                        end)
                         
                         task.wait(2)
                         getgenv().AutoHopEnabled = true
                     else
-                        -- 4. SERVER HOP IF NO RAID AND NO FRUITS
+                        -- 4. SERVER HOP
                         if getgenv().AutoHopEnabled then
                             StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                             StatusLabel.Text = "Status: Server clear. Hopping..."

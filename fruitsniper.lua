@@ -1,78 +1,68 @@
--- Wait for game to fully load
-repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+-- Delta Executor Auto-Launch System
+if not game:IsLoaded() then game.Loaded:Wait() end
+repeat task.wait(1) until game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")
 
--- Global Toggles
-getgenv().FruitSniperEnabled = false
-getgenv().AutoHopEnabled = false
+-- OVERNIGHT AFK PARAMETERS
+getgenv().FruitSniperEnabled = true
+getgenv().AutoHopEnabled = true
 getgenv().AntiAFKEnabled = true
+getgenv().AutoGachaEnabled = true
 
--- Create GUI Elements
+-- TARGET FILTERS (Strict Filtering)
+local TargetFruits = {
+    ["buddha"] = true,
+    ["portal"] = true,
+    ["kitsune"] = true,
+    ["dragon"] = true,
+    ["leopard"] = true,
+    ["dough"] = true,
+    ["t-rex"] = true,
+    ["mammoth"] = true,
+    ["spirit"] = true,
+    ["control"] = true,
+    ["venom"] = true,
+    ["shadow"] = true,
+    ["gravity"] = true
+}
+
+-- Setup Background Visual Engine Layout Grid
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
-local SniperToggle = Instance.new("TextButton")
-local HopToggle = Instance.new("TextButton")
 local StatusLabel = Instance.new("TextLabel")
 
--- Configure Screen GUI
-ScreenGui.Name = "FruitSniperGUI"
-ScreenGui.Parent = game.CoreGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Name = "NinjaPremiumSniper"
+pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ScreenGui.Parent then ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui") end
 
--- Main Menu Frame
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
-MainFrame.Size = UDim2.new(0, 250, 0, 220)
-MainFrame.Active = true
-MainFrame.Draggable = true -- Allows you to drag the menu on mobile screen
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
+MainFrame.Size = UDim2.new(0, 260, 0, 100)
+MainFrame.BorderSizePixel = 2
 
--- Title Bar
 Title.Name = "Title"
 Title.Parent = MainFrame
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = "NINJA FRUIT SNIPER"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 18
+Title.Text = "NINJA MYTHIC & GACHA SNIPER"
+Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.TextSize = 13
 
--- Fruit Sniper Toggle Button
-SniperToggle.Name = "SniperToggle"
-SniperToggle.Parent = MainFrame
-SniperToggle.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-SniperToggle.Position = UDim2.new(0.1, 0, 0.25, 0)
-SniperToggle.Size = UDim2.new(0.8, 0, 0, 35)
-SniperToggle.Font = Enum.Font.SourceSans
-SniperToggle.Text = "Fruit Sniper: OFF"
-SniperToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-SniperToggle.TextSize = 16
-
--- Auto Server Hop Toggle Button
-HopToggle.Name = "HopToggle"
-HopToggle.Parent = MainFrame
-HopToggle.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-HopToggle.Position = UDim2.new(0.1, 0, 0.48, 0)
-HopToggle.Size = UDim2.new(0.8, 0, 0, 35)
-HopToggle.Font = Enum.Font.SourceSans
-HopToggle.Text = "Auto Server Hop: OFF"
-HopToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-HopToggle.TextSize = 16
-
--- System Status Tracker Label
 StatusLabel.Name = "StatusLabel"
 StatusLabel.Parent = MainFrame
-StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-StatusLabel.Position = UDim2.new(0.1, 0, 0.72, 0)
-StatusLabel.Size = UDim2.new(0.8, 0, 0, 40)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+StatusLabel.Position = UDim2.new(0.05, 0, 0.40, 0)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 50)
 StatusLabel.Font = Enum.Font.SourceSansItalic
-StatusLabel.Text = "Status: Idle"
-StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-StatusLabel.TextSize = 14
+StatusLabel.Text = "Status: Waiting 15s for map assets to load completely..."
+StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+StatusLabel.TextSize = 12
 StatusLabel.TextWrapped = true
 
--- Anti-AFK Engine (Always running in background when script launches)
+-- Anti-AFK Engine Module
 local vu = game:GetService("VirtualUser")
 game.Players.LocalPlayer.Idled:Connect(function()
     if getgenv().AntiAFKEnabled then
@@ -81,9 +71,10 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- Server Hopping Logic Function
+-- Automated Public Server Changer
 local function hopServer()
-    StatusLabel.Text = "Status: Finding new server..."
+    StatusLabel.Text = "Status: Server dry. Changing servers..."
+    task.wait(1)
     local Http = game:GetService("HttpService")
     local Teleport = game:GetService("TeleportService")
     local success, result = pcall(function()
@@ -99,61 +90,64 @@ local function hopServer()
     end
 end
 
--- Button Functionality: Toggle Sniper
-SniperToggle.MouseButton1Click:Connect(function()
-    getgenv().FruitSniperEnabled = not getgenv().FruitSniperEnabled
-    if getgenv().FruitSniperEnabled then
-        SniperToggle.Text = "Fruit Sniper: ON"
-        SniperToggle.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    else
-        SniperToggle.Text = "Fruit Sniper: OFF"
-        SniperToggle.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        StatusLabel.Text = "Status: Idle"
-    end
-end)
-
--- Button Functionality: Toggle Auto Hop
-HopToggle.MouseButton1Click:Connect(function()
-    getgenv().AutoHopEnabled = not getgenv().AutoHopEnabled
-    if getgenv().AutoHopEnabled then
-        HopToggle.Text = "Auto Server Hop: ON"
-        HopToggle.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    else
-        HopToggle.Text = "Auto Server Hop: OFF"
-        HopToggle.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    end
-end)
-
--- Main Background Scanning Thread Loop
+-- Core Core Target Scanner & Auto-Storer Background Loop
 task.spawn(function()
+    -- CRITICAL FIX: Waits 15 seconds to let the server load fruits before scanning
+    task.wait(15)
+    
     while task.wait(1) do
-        if getgenv().FruitSniperEnabled then
-            local character = game.Players.LocalPlayer.Character
-            local root = character and character:FindFirstChild("HumanoidRootPart")
-            
-            if root then
-                local currentFruit = nil
-                -- Scan workspace map objects for things named fruit
-                for _, item in pairs(workspace:GetChildren()) do
-                    if string.find(string.lower(item.name), "fruit") then
-                        currentFruit = item
-                        break
+        local character = game.Players.LocalPlayer.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if root then
+            -- 1. AUTO GACHA ROLL AND STORE (Runs seamlessly every 2 hours)
+            if getgenv().AutoGachaEnabled then
+                pcall(function()
+                    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("GachaFruit")
+                end)
+            end
+
+            -- 2. DISCOVER AND INSPECT MAP FRUITS
+            local targetFruit = nil
+            for _, item in pairs(workspace:GetChildren()) do
+                if string.find(string.lower(item.name), "fruit") and not item:IsA("Texture") then
+                    local localizedName = string.lower(item.name):gsub("fruit", ""):gsub("%s+", "")
+                    for target, _ in pairs(TargetFruits) do
+                        if string.find(localizedName, target) then
+                            targetFruit = item
+                            break
+                        end
                     end
                 end
+            end
+
+            -- 3. INTERCEPT AND STOP LOGIC
+            if targetFruit then
+                -- STOP HOPPING IMMEDIATELY: Protects your spot on this server
+                getgenv().AutoHopEnabled = false
+                StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+                StatusLabel.Text = "Status: TARGET FOUND (" .. targetFruit.name .. ")! Saving hop..."
                 
-                if currentFruit then
-                    StatusLabel.Text = "Status: Found " .. currentFruit.name .. "! Teleporting..."
-                    root.CFrame = currentFruit:GetModelCFrame()
-                    task.wait(0.5)
-                    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StoreFruit", currentFruit.name, currentFruit)
+                -- Teleport directly onto the fruit model
+                root.CFrame = targetFruit:GetModelCFrame()
+                task.wait(1)
+                
+                -- Invoke remote data storage systems
+                StatusLabel.Text = "Status: Storing " .. targetFruit.name .. " to Inventory Chest..."
+                game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StoreFruit", targetFruit.name, targetFruit)
+                task.wait(3)
+                
+                -- Safely reactivate automation once inventory chest is updated
+                getgenv().AutoHopEnabled = true
+            else
+                -- If no rare fruits are on this map, safely hop to a new one
+                if getgenv().AutoHopEnabled then
+                    StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                    StatusLabel.Text = "Status: No rare fruits found on this server. Preparing hop..."
+                    task.wait(2)
+                    hopServer()
                 else
-                    if getgenv().AutoHopEnabled then
-                        StatusLabel.Text = "Status: No fruits. Triggering hop..."
-                        task.wait(2)
-                        hopServer()
-                    else
-                        StatusLabel.Text = "Status: No fruits found on this server."
-                    end
+                    StatusLabel.Text = "Status: Auto-hop frozen."
                 end
             end
         end

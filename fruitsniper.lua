@@ -1,7 +1,6 @@
 -- Delta Executor Native Script Framework
 if not game:IsLoaded() then game.Loaded:Wait() end
-task.wait(10) -- Extended 10-second wait for full game asset loading
-repeat task.wait(1) until game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+repeat task.wait(0.5) until game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")
 
 -- OVERNIGHT AFK PARAMETERS
 getgenv().FruitSniperEnabled = true
@@ -74,7 +73,7 @@ StatusLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
 StatusLabel.Position = UDim2.new(0.05, 0, 0.55, 0)
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 50)
 StatusLabel.Font = Enum.Font.SourceSansItalic
-StatusLabel.Text = "Status: Initializing systems..."
+StatusLabel.Text = "Status: Initializing team joiner..."
 StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
 StatusLabel.TextSize = 12
 StatusLabel.TextWrapped = true
@@ -134,65 +133,55 @@ local function hopServer()
     end
 end
 
--- Fail-Safe Marine Joiner
-local function forceJoinMarines()
-    local lp = game.Players.LocalPlayer
-    if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then 
-        return true 
-    end
-
-    -- 1. Direct CommF Remote Invoke
-    pcall(function()
-        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-        local commF = remotes and remotes:FindFirstChild("CommF")
-        if commF then
-            commF:InvokeServer("SetTeam", "Marines")
-        end
-    end)
-
-    task.wait(0.5)
-    if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then 
-        return true 
-    end
-
-    -- 2. UI Click Connections Override
-    pcall(function()
-        for _, v in pairs(lp.PlayerGui:GetDescendants()) do
-            if v:IsA("TextButton") or v:IsA("ImageButton") then
-                local nameLower = string.lower(v.Name)
-                local parentNameLower = v.Parent and string.lower(v.Parent.Name) or ""
-                if nameLower == "marines" or parentNameLower == "marines" or (v:IsA("TextButton") and string.find(string.lower(v.Text), "marine")) then
-                    for _, conn in pairs(getconnections(v.Activated)) do conn:Fire() end
-                    for _, conn in pairs(getconnections(v.MouseButton1Click)) do conn:Fire() end
-                    for _, conn in pairs(getconnections(v.MouseButton1Down)) do conn:Fire() end
-                end
-            end
-        end
-    end)
-
-    task.wait(0.5)
-    return (lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine"))
-end
-
 -- Primary Execution Thread
 task.spawn(function()
-    StatusLabel.Text = "Status: Joining Marine Team..."
-    local attempts = 0
+    local lp = game.Players.LocalPlayer
     
-    while attempts < 10 do
-        attempts = attempts + 1
-        if forceJoinMarines() then
+    -- 5-SECOND RETRY LOOP FOR MARINES
+    while true do
+        if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
+            -- Joined successfully -> Stop clicking immediately
+            StatusLabel.Text = "Status: Marines verified! Starting scans..."
+            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
             break
         end
-        task.wait(0.8)
+
+        StatusLabel.Text = "Status: Attempting to join Marines (Retrying every 5s)..."
+        
+        -- Attempt 1: Direct Remote Call
+        pcall(function()
+            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+            local commF = remotes and remotes:FindFirstChild("CommF")
+            if commF then
+                commF:InvokeServer("SetTeam", "Marines")
+            end
+        end)
+
+        -- Attempt 2: UI Click Trigger
+        pcall(function()
+            for _, v in pairs(lp.PlayerGui:GetDescendants()) do
+                if v:IsA("TextButton") or v:IsA("ImageButton") then
+                    local nameLower = string.lower(v.Name)
+                    local parentNameLower = v.Parent and string.lower(v.Parent.Name) or ""
+                    if nameLower == "marines" or parentNameLower == "marines" or (v:IsA("TextButton") and string.find(string.lower(v.Text), "marine")) then
+                        for _, conn in pairs(getconnections(v.Activated)) do conn:Fire() end
+                        for _, conn in pairs(getconnections(v.MouseButton1Click)) do conn:Fire() end
+                        for _, conn in pairs(getconnections(v.MouseButton1Down)) do conn:Fire() end
+                    end
+                end
+            end
+        end)
+
+        -- Wait 5 seconds before checking status again
+        task.wait(5)
     end
     
-    StatusLabel.Text = "Status: Joined Marines. Scanning workspace..."
-    task.wait(1.5)
+    task.wait(1)
     
+    -- MAIN SNIPER LOOP
     while task.wait(0.15) do
         if getgenv().FruitSniperEnabled then
-            local character = game.Players.LocalPlayer.Character
+            local character = lp.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChild("Humanoid")
             
@@ -221,7 +210,7 @@ task.spawn(function()
                     
                     -- Auto Equip Weapon
                     if not character:FindFirstChildOfClass("Tool") then
-                        local backpack = game.Players.LocalPlayer:FindFirstChild("Backpack")
+                        local backpack = lp:FindFirstChild("Backpack")
                         if backpack then
                             local tool = backpack:FindFirstChildOfClass("Tool")
                             if tool then
@@ -309,7 +298,7 @@ task.spawn(function()
                         end
                         
                         if not holdingFruit then
-                            local backpack = game.Players.LocalPlayer:FindFirstChild("Backpack")
+                            local backpack = lp:FindFirstChild("Backpack")
                             if backpack then
                                 for _, tool in pairs(backpack:GetChildren()) do
                                     if tool:IsA("Tool") and string.find(string.lower(tool.Name), "fruit") then

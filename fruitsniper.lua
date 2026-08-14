@@ -213,7 +213,7 @@ task.spawn(function()
     end
 end)
 
--- ADVANCED SERVER HOPPER (RESTRICTED & GHOST SERVER BYPASS)
+-- BULLETPROOF SERVER HOPPER (RESTRICTED BYPASS)
 local isHopping = false 
 
 local function getBlacklist()
@@ -250,28 +250,37 @@ local function hopServer()
     
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
     StatusLabel.Text = "Status: Bypassing restricted servers..."
-    sendNotification("Scanning for healthy servers...", Color3.fromRGB(255, 165, 0))
+    sendNotification("Scanning for clean servers...", Color3.fromRGB(255, 165, 0))
     
     local success, err = pcall(function()
         local validServers = {}
-        local cursors = {"", "&cursor=1", "&cursor=2"} 
-        local randomCursor = cursors[math.random(1, #cursors)]
+        local cursor = ""
         
-        local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100" .. randomCursor
-        local response = game:HttpGet(url)
-        local data = HttpService:JSONDecode(response)
-        
-        if data and data.data then
-            for _, s in pairs(data.data) do
-                if type(s) == "table" and s.id and s.playing and s.maxPlayers then
-                    -- STRICT FILTER: Valid ping, not blacklisted, not current, 6 to 10 players
-                    if s.ping and not serverBlacklist[s.id] and s.id ~= game.JobId then
-                        if s.playing >= 6 and s.playing <= (s.maxPlayers - 2) then
-                            table.insert(validServers, s.id)
+        -- Pull multiple pages through RoProxy to ensure we find healthy public servers
+        for i = 1, 2 do
+            local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
+            local response = game:HttpGet(url)
+            local data = HttpService:JSONDecode(response)
+            
+            if data and data.data then
+                for _, s in pairs(data.data) do
+                    if type(s) == "table" and s.id and s.playing and s.maxPlayers then
+                        -- Strict validation: Must not be current, not blacklisted, playing between 4 and max-1 players
+                        if s.id ~= game.JobId and not serverBlacklist[s.id] then
+                            if s.playing >= 4 and s.playing < s.maxPlayers then
+                                table.insert(validServers, s.id)
+                            end
                         end
                     end
                 end
             end
+            
+            if data.nextPageCursor and data.nextPageCursor ~= "" then
+                cursor = data.nextPageCursor
+            else
+                break
+            end
+            task.wait(0.1)
         end
         
         if #validServers > 0 then
@@ -282,25 +291,28 @@ local function hopServer()
             StatusLabel.Text = "Status: Teleporting safely..."
             TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, LocalPlayer)
         else
-            sendNotification("Proxy empty, trying deep search...", Color3.fromRGB(255, 165, 0))
-            TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            -- Clear blacklist and instantly retry if pool runs out
+            serverBlacklist = {}
+            saveBlacklist(serverBlacklist)
+            isHopping = false
+            task.wait(1)
+            hopServer()
         end
     end)
     
     if not success then
-        sendNotification("Proxy timeout, standard queue...", Color3.fromRGB(255, 100, 100))
-        pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
+        sendNotification("Hop error, retrying...", Color3.fromRGB(255, 100, 100))
+        task.wait(2)
+        isHopping = false
+        hopServer()
     end
-    
-    task.wait(10)
-    isHopping = false 
 end
 
 TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
     if player == LocalPlayer then
         isHopping = false
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Hop rejected, grabbing new ID..."
+        StatusLabel.Text = "Status: Restricted server avoided, hopping..."
         task.wait(1)
         hopServer()
     end

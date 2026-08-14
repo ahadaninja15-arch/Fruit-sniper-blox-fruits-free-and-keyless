@@ -28,9 +28,6 @@ local TargetFruits = {
     ["gravity"] = true
 }
 
--- Memory table to track and ignore bad / restricted / visited servers
-local VisitedServers = {}
-
 -- Setup Draggable UI Framework with Minimize / Open Button
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
@@ -128,6 +125,21 @@ local function sendNotification(message, color)
     print("[Ninja Sniper Notif]: " .. message)
 end
 
+-- Auto Haki Function
+local function verifyAndEnableHaki()
+    pcall(function()
+        local lp = game.Players.LocalPlayer
+        local character = lp.Character
+        if character and not character:FindFirstChild("HasBuso") then
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local commF = ReplicatedStorage.Remotes:FindFirstChild("CommF_") or ReplicatedStorage.Remotes:FindFirstChild("CommF")
+            if commF then
+                commF:InvokeServer("Buso")
+            end
+        end
+    end)
+end
+
 -- Minimize / Open Logic
 MinimizeButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
@@ -168,75 +180,50 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- DELTA NATIVE REQUEST BRIDGE FOR SERVER LIST FETCHING
-local requestFunc = (syn and syn.request) or request or http_request or (fluxus and fluxus.request)
+-- ROBUST NATIVE SERVER HOP (Bypasses API blocks)
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Fetching public servers..."
-    sendNotification("Searching for a better server...", Color3.fromRGB(255, 165, 0))
-    task.wait(0.5)
+    StatusLabel.Text = "Status: Hopping server..."
+    sendNotification("Executing server hop...", Color3.fromRGB(255, 165, 0))
     
-    local Http = game:GetService("HttpService")
-    local Teleport = game:GetService("TeleportService")
-    
-    VisitedServers[game.JobId] = true
-    
-    local ApiUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
-    local rawData = nil
+    local servers = {}
+    local site = nil
     
     pcall(function()
-        if requestFunc then
-            local response = requestFunc({
-                Url = ApiUrl,
-                Method = "GET"
-            })
-            if response and response.Body then
-                rawData = response.Body
-            end
-        else
-            rawData = game:HttpGet(ApiUrl)
-        end
+        site = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
     end)
     
-    if rawData then
-        local success, result = pcall(function() return Http:JSONDecode(rawData) end)
-        
-        if success and result and result.data then
-            for _, server in pairs(result.data) do
-                local currentP = server.playing or 12
-                local serverId = server.id
-                
-                -- Target 3-8 player servers safely
-                if currentP >= 3 and currentP <= 8 and serverId ~= game.JobId and not VisitedServers[serverId] then
-                    VisitedServers[serverId] = true
-                    StatusLabel.Text = "Status: Hopping (" .. currentP .. "/8 players)..."
-                    sendNotification("Hopping to server with " .. currentP .. " players!", Color3.fromRGB(0, 255, 200))
-                    
-                    local tpSuccess = pcall(function()
-                        Teleport:TeleportToPlaceInstance(game.PlaceId, serverId, game.Players.LocalPlayer)
-                    end)
-                    
-                    if tpSuccess then
-                        task.wait(4)
-                        return
-                    end
+    if site and site.data then
+        for _, server in ipairs(site.data) do
+            if type(server) == "table" and server.maxPlayers and server.playing and server.id then
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    table.insert(servers, server.id)
                 end
             end
         end
     end
     
-    StatusLabel.Text = "Status: Retrying server list..."
-    task.wait(2)
-    hopServer()
+    if #servers > 0 then
+        local targetServer = servers[math.random(1, #servers)]
+        StatusLabel.Text = "Status: Teleporting..."
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServer, game.Players.LocalPlayer)
+        end)
+    else
+        StatusLabel.Text = "Status: Hop retry..."
+        task.wait(2)
+        hopServer()
+    end
 end
 
-game:GetService("TeleportService").TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
     if player == game.Players.LocalPlayer then
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Restricted server hit. Retrying..."
-        sendNotification("Restricted server block hit, retrying hop...", Color3.fromRGB(255, 80, 80))
+        StatusLabel.Text = "Status: Hop failed, retrying..."
         task.wait(1)
         hopServer()
     end
@@ -330,6 +317,8 @@ task.spawn(function()
                     StatusLabel.Text = "Status: CASTLE RAID ACTIVE!"
                     sendNotification("Castle Raid active! Fighting " .. #raidEnemies .. " raiders.", Color3.fromRGB(255, 140, 0))
                     
+                    verifyAndEnableHaki()
+
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = lp:FindFirstChild("Backpack")
                         if backpack then
@@ -338,7 +327,7 @@ task.spawn(function()
                         end
                     end
 
-                    -- Hover safely above the target (10 studs up) to avoid enemy melee hits
+                    -- Hover safely above the target (10 studs up)
                     local baseTarget = raidEnemies[1]:FindFirstChild("HumanoidRootPart")
                     if baseTarget then
                         root.CFrame = baseTarget.CFrame + Vector3.new(0, 10, 0)
@@ -406,7 +395,9 @@ task.spawn(function()
                         pcall(function()
                             local ReplicatedStorage = game:GetService("ReplicatedStorage")
                             local commF = ReplicatedStorage.Remotes:FindFirstChild("CommF_") or ReplicatedStorage.Remotes:FindFirstChild("CommF")
-                            commF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
+                            if commF then
+                                commF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
+                            end
                         end)
                         
                         task.wait(2)

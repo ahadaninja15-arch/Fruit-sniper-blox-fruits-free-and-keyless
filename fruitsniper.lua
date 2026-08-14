@@ -260,98 +260,23 @@ task.spawn(function()
     end
 end)
 
--- BULLETPROOF SERVER HOPPER (FILTERS PRIVATE, FULL, & VIP SERVERS)
+-- BULLETPROOF SERVER HOPPER (ABSOLUTE 0 RESTRICTED/PRIVATE/VIP SERVERS VIA ROBLOX CORE QUEUE)
 local isHopping = false 
-
-local function getBlacklist()
-    if isfile and readfile and isfile("NinjaServerBlacklist.json") then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile("NinjaServerBlacklist.json"))
-        end)
-        if success and type(data) == "table" then return data end
-    end
-    return {}
-end
-
-local function saveBlacklist(tbl)
-    if writefile then
-        pcall(function()
-            writefile("NinjaServerBlacklist.json", HttpService:JSONEncode(tbl))
-        end)
-    end
-end
-
-local serverBlacklist = getBlacklist()
-serverBlacklist[game.JobId] = os.time() 
-
-for id, timeAdded in pairs(serverBlacklist) do
-    if os.time() - timeAdded > 1800 then
-        serverBlacklist[id] = nil
-    end
-end
-saveBlacklist(serverBlacklist)
 
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled or isHopping then return end
     isHopping = true 
     
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Filtering clean servers..."
-    sendNotification("Scanning public API...", Color3.fromRGB(255, 165, 0))
+    StatusLabel.Text = "Status: Hopping public server..."
+    sendNotification("Switching via Roblox native queue...", Color3.fromRGB(255, 165, 0))
     
-    local success, err = pcall(function()
-        local validServers = {}
-        local cursor = ""
-        
-        for i = 1, 4 do
-            local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
-            local response = game:HttpGet(url)
-            local data = HttpService:JSONDecode(response)
-            
-            if data and data.data then
-                for _, s in pairs(data.data) do
-                    if type(s) == "table" and s.id and s.playing and s.maxPlayers then
-                        -- Strict checks to avoid VIP, restricted, full, or dead servers
-                        local isPrivateOrRestricted = s.private or s.showPrivateContent == true
-                        if not isPrivateOrRestricted and s.id ~= game.JobId and not serverBlacklist[s.id] then
-                            if s.playing >= 3 and s.playing <= (s.maxPlayers - 2) then
-                                table.insert(validServers, s.id)
-                            end
-                        end
-                    end
-                end
-            end
-            
-            if data.nextPageCursor and data.nextPageCursor ~= "" then
-                cursor = data.nextPageCursor
-            else
-                break
-            end
-            task.wait(0.05)
-        end
-        
-        if #validServers > 0 then
-            local targetId = validServers[math.random(1, #validServers)]
-            serverBlacklist[targetId] = os.time()
-            saveBlacklist(serverBlacklist)
-            
-            StatusLabel.Text = "Status: Teleporting to public server..."
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, LocalPlayer)
-        else
-            -- Safe public queue fallback using standard Roblox service instead of random raw IDs
-            StatusLabel.Text = "Status: Fallback queue hop..."
-            TeleportService:Teleport(game.PlaceId, LocalPlayer)
-        end
+    -- Bypass all broken roproxy endpoints entirely by utilizing official Roblox matchmaker queuing which never returns 403 or restricted/VIP instances.
+    pcall(function()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end)
     
-    if not success then
-        sendNotification("Hop exception, retrying...", Color3.fromRGB(255, 100, 100))
-        task.wait(2)
-        isHopping = false
-        pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
-    end
-    
-    task.wait(8)
+    task.wait(10)
     isHopping = false 
 end
 
@@ -359,7 +284,7 @@ TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, erro
     if player == LocalPlayer then
         isHopping = false
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Hop rejected/restricted, retrying..."
+        StatusLabel.Text = "Status: Hop failed, re-attempting..."
         task.wait(1)
         hopServer()
     end

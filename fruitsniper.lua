@@ -256,27 +256,7 @@ task.spawn(function()
             
             if root and humanoid and humanoid.Health > 0 then
                 
-                -- 1. RAID NOTIFICATION SCANNER (Checks Blox Fruits on-screen text alert banners)
-                local raidNotificationActive = false
-                if getgenv().AutoPirateRaid then
-                    local playerGui = lp:FindFirstChild("PlayerGui")
-                    if playerGui then
-                        local transitGui = playerGui:FindFirstChild("Transit") or playerGui:FindFirstChild("Main") or playerGui:FindFirstChild("Notifications")
-                        if transitGui then
-                            for _, v in pairs(transitGui:GetDescendants()) do
-                                if v:IsA("TextLabel") and v.Visible then
-                                    local txt = string.lower(v.Text)
-                                    if string.find(txt, "pirate") or string.find(txt, "castle") or string.find(txt, "raid") or string.find(txt, "spawned") then
-                                        raidNotificationActive = true
-                                        break
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-                -- 2. ENEMY ENTITY CHECK
+                -- 1. ABSOLUTE STRICT ENTITY CHECK (Ignores all normal NPCs, ONLY triggers on actual active pirate raid spawns)
                 local raidEnemies = {}
                 if getgenv().AutoPirateRaid then
                     local enemies = workspace:FindFirstChild("Enemies")
@@ -287,9 +267,11 @@ task.spawn(function()
                             
                             if eRoot and hum and hum.Health > 0 then
                                 local distToCastle = (eRoot.Position - Vector3.new(-5053, 315, -3155)).Magnitude
-                                if distToCastle <= 350 then
+                                -- Must be tightly clustered right at Castle on the Sea courtyard/spawn
+                                if distToCastle <= 200 then
                                     local name = string.lower(enemy.Name)
-                                    if string.find(name, "pirate") or string.find(name, "island boy") or string.find(name, "captain elephant") or string.find(name, "mythological pirate") then
+                                    -- STRICT check: Only target actual event boss/mob names, ignoring normal Sea 3 NPCs completely
+                                    if name == "pirate" or name == "island boy" or name == "captain elephant" or name == "mythological pirate" or string.find(name, "pirate raid") then
                                         table.insert(raidEnemies, enemy)
                                     end
                                 end
@@ -298,12 +280,12 @@ task.spawn(function()
                     end
                 end
 
-                -- TRIGGER FIGHT IF NOTIFICATION OR SPAWNED ENEMIES DETECTED
-                if raidNotificationActive or #raidEnemies > 0 then
+                -- ONLY ATTACK IF 2 OR MORE EVENT RAID MOBS ACTUALLY EXIST AT THE SPOT (Prevents false triggers on random stuck NPCs)
+                if #raidEnemies >= 2 then
                     getgenv().AutoHopEnabled = false
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
-                    StatusLabel.Text = "Status: RAID DETECTED!"
-                    sendNotification("Raid alert detected! Getting ready to fight.", Color3.fromRGB(255, 140, 0))
+                    StatusLabel.Text = "Status: RAID CONFIRMED!"
+                    sendNotification("Confirmed raid! Fighting " .. #raidEnemies .. " raiders.", Color3.fromRGB(255, 140, 0))
                     
                     -- GUARANTEED HAKI ACTIVATOR
                     pcall(function()
@@ -330,17 +312,14 @@ task.spawn(function()
                         end
                     end
 
-                    -- Hover safely above the target or castle spawn area (10 studs up)
-                    if #raidEnemies > 0 and raidEnemies[1]:FindFirstChild("HumanoidRootPart") then
+                    if raidEnemies[1]:FindFirstChild("HumanoidRootPart") then
                         root.CFrame = raidEnemies[1].HumanoidRootPart.CFrame + Vector3.new(0, 10, 0)
-                    else
-                        root.CFrame = CFrame.new(-5053, 325, -3155)
                     end
                     
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
                 else
-                    -- 3. INSTANT FRUIT SCAN
+                    -- 2. INSTANT FRUIT SCAN
                     local targetFruit = nil
                     for _, item in pairs(workspace:GetChildren()) do
                         local nameLower = string.lower(item.Name)
@@ -355,7 +334,7 @@ task.spawn(function()
                         end
                     end
 
-                    -- 4. FRUIT PICKUP & STORE ROUTINE
+                    -- 3. FRUIT PICKUP & STORE ROUTINE
                     if targetFruit then
                         getgenv().AutoHopEnabled = false
                         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
@@ -407,7 +386,7 @@ task.spawn(function()
                         task.wait(2)
                         getgenv().AutoHopEnabled = true
                     else
-                        -- 5. SAFE SERVER HOP
+                        -- 4. SAFE SERVER HOP
                         if getgenv().AutoHopEnabled then
                             StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                             StatusLabel.Text = "Status: Server clear. Hopping..."

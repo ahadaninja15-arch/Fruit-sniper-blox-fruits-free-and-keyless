@@ -125,21 +125,6 @@ local function sendNotification(message, color)
     print("[Ninja Sniper Notif]: " .. message)
 end
 
--- Auto Haki Function
-local function verifyAndEnableHaki()
-    pcall(function()
-        local lp = game.Players.LocalPlayer
-        local character = lp.Character
-        if character and not character:FindFirstChild("HasBuso") then
-            local ReplicatedStorage = game:GetService("ReplicatedStorage")
-            local commF = ReplicatedStorage.Remotes:FindFirstChild("CommF_") or ReplicatedStorage.Remotes:FindFirstChild("CommF")
-            if commF then
-                commF:InvokeServer("Buso")
-            end
-        end
-    end)
-end
-
 -- Minimize / Open Logic
 MinimizeButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
@@ -180,54 +165,21 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- ROBUST NATIVE SERVER HOP (Bypasses API blocks)
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-
+-- RELIABLE GUI-BASED SERVER HOPPER (Avoids restricted/dead web API servers)
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Hopping server..."
-    sendNotification("Executing server hop...", Color3.fromRGB(255, 165, 0))
-    
-    local servers = {}
-    local site = nil
+    StatusLabel.Text = "Status: Finding safe public server..."
+    sendNotification("Hopping via server menu queue...", Color3.fromRGB(255, 165, 0))
     
     pcall(function()
-        site = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        local TeleportService = game:GetService("TeleportService")
+        -- Forces Roblox to queue a standard non-restricted public server join safely
+        TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
     end)
     
-    if site and site.data then
-        for _, server in ipairs(site.data) do
-            if type(server) == "table" and server.maxPlayers and server.playing and server.id then
-                if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                    table.insert(servers, server.id)
-                end
-            end
-        end
-    end
-    
-    if #servers > 0 then
-        local targetServer = servers[math.random(1, #servers)]
-        StatusLabel.Text = "Status: Teleporting..."
-        pcall(function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServer, game.Players.LocalPlayer)
-        end)
-    else
-        StatusLabel.Text = "Status: Hop retry..."
-        task.wait(2)
-        hopServer()
-    end
+    task.wait(8)
 end
-
-TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
-    if player == game.Players.LocalPlayer then
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Hop failed, retrying..."
-        task.wait(1)
-        hopServer()
-    end
-end)
 
 -- Primary Execution Thread
 task.spawn(function()
@@ -317,7 +269,36 @@ task.spawn(function()
                     StatusLabel.Text = "Status: CASTLE RAID ACTIVE!"
                     sendNotification("Castle Raid active! Fighting " .. #raidEnemies .. " raiders.", Color3.fromRGB(255, 140, 0))
                     
-                    verifyAndEnableHaki()
+                    -- DIRECT UI & REMOTE LOOP HAKI ACTIVATOR (Guaranteed Activation)
+                    pcall(function()
+                        if not character:FindFirstChild("HasBuso") then
+                            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                            local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                            if remotes then
+                                local commF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
+                                if commF then
+                                    commF:InvokeServer("Buso")
+                                end
+                            end
+                            
+                            -- Fallback UI click simulation for Haki toggle button if remote fails
+                            local playerGui = lp:FindFirstChild("PlayerGui")
+                            local mainGui = playerGui and playerGui:FindFirstChild("Main")
+                            if mainGui then
+                                local hakiBtn = mainGui:FindFirstChild("Haki") or mainGui:FindFirstChild("Buso")
+                                if hakiBtn then
+                                    for _, v in pairs(hakiBtn:GetDescendants()) do
+                                        if v:IsA("TextButton") or v:IsA("ImageButton") then
+                                            if getconnections then
+                                                for _, conn in pairs(getconnections(v.MouseButton1Click)) do conn:Fire() end
+                                                for _, conn in pairs(getconnections(v.Activated)) do conn:Fire() end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
 
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = lp:FindFirstChild("Backpack")

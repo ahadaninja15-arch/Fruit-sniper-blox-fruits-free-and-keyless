@@ -165,23 +165,37 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- RELIABLE GUI-BASED SERVER HOPPER (Avoids restricted/dead web API servers)
+-- BULLETPROOF PUBLIC SERVER HOPPER
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Finding safe public server..."
-    sendNotification("Hopping via server menu queue...", Color3.fromRGB(255, 165, 0))
+    StatusLabel.Text = "Status: Finding open public server..."
+    sendNotification("Switching to an open server...", Color3.fromRGB(255, 165, 0))
     
-    pcall(function()
-        local TeleportService = game:GetService("TeleportService")
-        -- Forces Roblox to queue a standard non-restricted public server join safely
-        TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
-    end)
+    local TeleportService = game:GetService("TeleportService")
+    local success = false
     
-    task.wait(8)
+    repeat
+        pcall(function()
+            TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
+            success = true
+        end)
+        if not success then task.wait(2) end
+    until success
+    
+    task.wait(6)
 end
 
--- Primary Execution Thread
+game:GetService("TeleportService").TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+    if player == game.Players.LocalPlayer then
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        StatusLabel.Text = "Status: Server full/restricted, retrying..."
+        task.wait(1)
+        hopServer()
+    end
+end)
+
+-- PRIMARY EXECUTION THREAD
 task.spawn(function()
     local lp = game.Players.LocalPlayer
     
@@ -241,7 +255,28 @@ task.spawn(function()
             local humanoid = character and character:FindFirstChild("Humanoid")
             
             if root and humanoid and humanoid.Health > 0 then
-                -- 1. STRICT CASTLE ON THE SEA PIRATE RAID DETECTOR
+                
+                -- 1. RAID NOTIFICATION SCANNER (Checks Blox Fruits on-screen text alert banners)
+                local raidNotificationActive = false
+                if getgenv().AutoPirateRaid then
+                    local playerGui = lp:FindFirstChild("PlayerGui")
+                    if playerGui then
+                        local transitGui = playerGui:FindFirstChild("Transit") or playerGui:FindFirstChild("Main") or playerGui:FindFirstChild("Notifications")
+                        if transitGui then
+                            for _, v in pairs(transitGui:GetDescendants()) do
+                                if v:IsA("TextLabel") and v.Visible then
+                                    local txt = string.lower(v.Text)
+                                    if string.find(txt, "pirate") or string.find(txt, "castle") or string.find(txt, "raid") or string.find(txt, "spawned") then
+                                        raidNotificationActive = true
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                -- 2. ENEMY ENTITY CHECK
                 local raidEnemies = {}
                 if getgenv().AutoPirateRaid then
                     local enemies = workspace:FindFirstChild("Enemies")
@@ -263,39 +298,26 @@ task.spawn(function()
                     end
                 end
 
-                if #raidEnemies > 0 then
+                -- TRIGGER FIGHT IF NOTIFICATION OR SPAWNED ENEMIES DETECTED
+                if raidNotificationActive or #raidEnemies > 0 then
                     getgenv().AutoHopEnabled = false
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
-                    StatusLabel.Text = "Status: CASTLE RAID ACTIVE!"
-                    sendNotification("Castle Raid active! Fighting " .. #raidEnemies .. " raiders.", Color3.fromRGB(255, 140, 0))
+                    StatusLabel.Text = "Status: RAID DETECTED!"
+                    sendNotification("Raid alert detected! Getting ready to fight.", Color3.fromRGB(255, 140, 0))
                     
-                    -- DIRECT UI & REMOTE LOOP HAKI ACTIVATOR (Guaranteed Activation)
+                    -- GUARANTEED HAKI ACTIVATOR
                     pcall(function()
                         if not character:FindFirstChild("HasBuso") then
                             local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                            local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-                            if remotes then
-                                local commF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
-                                if commF then
-                                    commF:InvokeServer("Buso")
-                                end
+                            local commF = ReplicatedStorage.Remotes:FindFirstChild("CommF_") or ReplicatedStorage.Remotes:FindFirstChild("CommF")
+                            if commF then
+                                commF:InvokeServer("Buso")
                             end
-                            
-                            -- Fallback UI click simulation for Haki toggle button if remote fails
-                            local playerGui = lp:FindFirstChild("PlayerGui")
-                            local mainGui = playerGui and playerGui:FindFirstChild("Main")
-                            if mainGui then
-                                local hakiBtn = mainGui:FindFirstChild("Haki") or mainGui:FindFirstChild("Buso")
-                                if hakiBtn then
-                                    for _, v in pairs(hakiBtn:GetDescendants()) do
-                                        if v:IsA("TextButton") or v:IsA("ImageButton") then
-                                            if getconnections then
-                                                for _, conn in pairs(getconnections(v.MouseButton1Click)) do conn:Fire() end
-                                                for _, conn in pairs(getconnections(v.Activated)) do conn:Fire() end
-                                            end
-                                        end
-                                    end
-                                end
+                            local vim = game:GetService("VirtualInputManager")
+                            if vim then
+                                vim:SendKeyEvent(true, Enum.KeyCode.J, false, game)
+                                task.wait(0.05)
+                                vim:SendKeyEvent(false, Enum.KeyCode.J, false, game)
                             end
                         end
                     end)
@@ -308,16 +330,17 @@ task.spawn(function()
                         end
                     end
 
-                    -- Hover safely above the target (10 studs up)
-                    local baseTarget = raidEnemies[1]:FindFirstChild("HumanoidRootPart")
-                    if baseTarget then
-                        root.CFrame = baseTarget.CFrame + Vector3.new(0, 10, 0)
+                    -- Hover safely above the target or castle spawn area (10 studs up)
+                    if #raidEnemies > 0 and raidEnemies[1]:FindFirstChild("HumanoidRootPart") then
+                        root.CFrame = raidEnemies[1].HumanoidRootPart.CFrame + Vector3.new(0, 10, 0)
+                    else
+                        root.CFrame = CFrame.new(-5053, 325, -3155)
                     end
                     
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
                 else
-                    -- 2. INSTANT FRUIT SCAN
+                    -- 3. INSTANT FRUIT SCAN
                     local targetFruit = nil
                     for _, item in pairs(workspace:GetChildren()) do
                         local nameLower = string.lower(item.Name)
@@ -332,7 +355,7 @@ task.spawn(function()
                         end
                     end
 
-                    -- 3. FRUIT PICKUP & STORE ROUTINE
+                    -- 4. FRUIT PICKUP & STORE ROUTINE
                     if targetFruit then
                         getgenv().AutoHopEnabled = false
                         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
@@ -384,7 +407,7 @@ task.spawn(function()
                         task.wait(2)
                         getgenv().AutoHopEnabled = true
                     else
-                        -- 4. SAFE SERVER HOP
+                        -- 5. SAFE SERVER HOP
                         if getgenv().AutoHopEnabled then
                             StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                             StatusLabel.Text = "Status: Server clear. Hopping..."

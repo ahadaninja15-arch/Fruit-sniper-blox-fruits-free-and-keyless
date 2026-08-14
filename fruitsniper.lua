@@ -2,32 +2,32 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 repeat task.wait(0.5) until game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")
 
--- OVERNIGHT AFK PARAMETERS
+-- OVERNIGHT AFK & TOGGLE PARAMETERS
 getgenv().FruitSniperEnabled = true
 getgenv().AutoHopEnabled = true
 getgenv().AntiAFKEnabled = true
 getgenv().AutoPirateRaid = true
+getgenv().AutoBusoHaki = true   
+getgenv().AutoKenHaki = false   
 
--- TARGET FILTERS (Strict Matching Keys)
+-- TARGET FILTERS
 local TargetFruits = {
-    ["buddha"] = true,
-    ["portal"] = true,
-    ["lightning"] = true,
-    ["pain"] = true,
-    ["kitsune"] = true,
-    ["dragon"] = true,
-    ["leopard"] = true,
-    ["dough"] = true,
-    ["t-rex"] = true,
-    ["mammoth"] = true,
-    ["spirit"] = true,
-    ["control"] = true,
-    ["venom"] = true,
-    ["shadow"] = true,
-    ["gravity"] = true
+    ["buddha"] = true, ["portal"] = true, ["lightning"] = true,
+    ["pain"] = true, ["kitsune"] = true, ["dragon"] = true,
+    ["leopard"] = true, ["dough"] = true, ["t-rex"] = true,
+    ["mammoth"] = true, ["spirit"] = true, ["control"] = true,
+    ["venom"] = true, ["shadow"] = true, ["gravity"] = true
 }
 
--- Setup Draggable UI Framework with Minimize / Open Button
+-- SERVICES DECLARATION
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
+local LocalPlayer = game.Players.LocalPlayer
+
+-- SETUP DRAGGABLE UI FRAMEWORK
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
@@ -39,7 +39,7 @@ local NotificationLabel = Instance.new("TextLabel")
 
 ScreenGui.Name = "NinjaPremiumSniper"
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
-if not ScreenGui.Parent then ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui") end
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
@@ -117,9 +117,7 @@ NotificationLabel.TextWrapped = true
 
 local function sendNotification(message, color)
     NotificationLabel.Text = "Notif: " .. message
-    if color then
-        NotificationLabel.TextColor3 = color
-    end
+    if color then NotificationLabel.TextColor3 = color end
     print("[Ninja Sniper Notif]: " .. message)
 end
 
@@ -152,74 +150,116 @@ ControlButton.MouseButton1Click:Connect(function()
     end
 end)
 
-local vu = game:GetService("VirtualUser")
-game.Players.LocalPlayer.Idled:Connect(function()
+-- ANTI-AFK SYSTEM
+LocalPlayer.Idled:Connect(function()
     if getgenv().AntiAFKEnabled then
-        vu:CaptureController()
-        vu:ClickButton2(Vector2.new(0,0))
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new(0,0))
     end
 end)
 
--- **CRITICAL FIX: PROXY ADDED FOR ROBLOX API** 
--- Standard Roblox API endpoints block internal game:HttpGet calls (TrustCheck). 
--- This uses roproxy so Delta can successfully read the player counts without silently failing.
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
+-- AUTOMATED DUAL HAKI SYSTEM MODULE
+local function activateHaki()
+    if not getgenv().FruitSniperEnabled then return end
+    
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return end
 
+    if getgenv().AutoBusoHaki then
+        local hasBusoActive = character:FindFirstChild("HasBuso") or character:FindFirstChild("Buso")
+        if not hasBusoActive then
+            pcall(function()
+                local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                local commF = remotes and (remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF"))
+                if commF then commF:InvokeServer("Buso") end
+            end)
+            pcall(function()
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.J, false, game)
+                task.wait(0.05)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.J, false, game)
+            end)
+        end
+    end
+
+    if getgenv().AutoKenHaki then
+        local hasKenActive = character:FindFirstChild("HasKen") or character:FindFirstChild("Ken")
+        if not hasKenActive then
+            pcall(function()
+                local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                local commF = remotes and (remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF"))
+                if commF then commF:InvokeServer("Ken") end
+            end)
+            pcall(function()
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                task.wait(0.05)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            end)
+        end
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    newCharacter:WaitForChild("HumanoidRootPart", 10)
+    task.wait(1.5)
+    activateHaki()
+end)
+
+task.spawn(function()
+    while task.wait(3) do
+        activateHaki()
+    end
+end)
+
+-- OPTIMIZED PROXY SERVER HOPPER
+local isHopping = false -- DEBOUNCE PREVENTS CRASHING
 local function hopServer()
-    if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
+    if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled or isHopping then return end
+    isHopping = true 
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Scanning active servers via proxy..."
-    sendNotification("Checking player counts...", Color3.fromRGB(255, 165, 0))
+    StatusLabel.Text = "Status: Scanning safe active servers..."
+    sendNotification("Filtering player counts...", Color3.fromRGB(255, 165, 0))
     
     local success, err = pcall(function()
         local validServers = {}
-        local cursor = ""
+        local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
+        local response = game:HttpGet(url)
+        local data = HttpService:JSONDecode(response)
         
-        repeat
-            -- Used roproxy.com to bypass TrustCheck limitations in executors
-            local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
-            local response = game:HttpGet(url)
-            local data = HttpService:JSONDecode(response)
-            
-            if data and data.data then
-                for _, s in pairs(data.data) do
-                    -- Check if fields exist and verify player count is safely below maximum limit
-                    if type(s) == "table" and s.playing and s.maxPlayers and s.id then
-                        -- Ignores servers that are full or have 1 slot left (must have at least 2 open slots and not current job ID)
-                        if s.playing < (s.maxPlayers - 2) and s.id ~= game.JobId then
-                            table.insert(validServers, s.id)
-                        end
+        if data and data.data then
+            for _, s in pairs(data.data) do
+                if type(s) == "table" and s.playing and s.maxPlayers and s.id then
+                    if s.playing >= 3 and s.playing <= (s.maxPlayers - 3) and s.id ~= game.JobId then
+                        table.insert(validServers, s.id)
                     end
                 end
             end
-            
-            cursor = data.nextPageCursor
-            task.wait(0.2)
-        until #validServers > 0 or not cursor or cursor == ""
+        end
         
         if #validServers > 0 then
             local targetId = validServers[math.random(1, #validServers)]
-            StatusLabel.Text = "Status: Joining verified open server..."
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, game.Players.LocalPlayer)
+            StatusLabel.Text = "Status: Teleporting to verified server..."
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, LocalPlayer)
         else
-            -- If proxy fails entirely, fallback to native queue
-            TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
+            sendNotification("Proxy empty, trying default queue...", Color3.fromRGB(255, 165, 0))
+            TeleportService:Teleport(game.PlaceId, LocalPlayer)
         end
     end)
     
     if not success then
         sendNotification("Proxy timeout, using standard queue...", Color3.fromRGB(255, 100, 100))
-        pcall(function()
-            TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
-        end)
+        pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
     end
     
-    task.wait(6)
+    task.wait(10)
+    isHopping = false 
 end
 
 TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
-    if player == game.Players.LocalPlayer then
+    if player == LocalPlayer then
+        isHopping = false
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
         StatusLabel.Text = "Status: Server rejected, finding another..."
         task.wait(1)
@@ -227,36 +267,10 @@ TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, erro
     end
 end)
 
--- **SAFE HAKI TOGGLER**
-local function ensureHakiActive(character)
-    pcall(function()
-        if not character:FindFirstChild("HasBuso") and not character:FindFirstChild("Buso") then
-            local ReplicatedStorage = game:GetService("ReplicatedStorage")
-            local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-            if remotes then
-                local commF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
-                if commF then
-                    commF:InvokeServer("Buso")
-                end
-            end
-            
-            local vim = game:GetService("VirtualInputManager")
-            if vim then
-                vim:SendKeyEvent(true, Enum.KeyCode.J, false, game)
-                task.wait(0.05)
-                vim:SendKeyEvent(false, Enum.KeyCode.J, false, game)
-            end
-        end
-    end)
-end
-
 -- PRIMARY EXECUTION THREAD
 task.spawn(function()
-    local lp = game.Players.LocalPlayer
-    
-    -- DIRECT RELIABLE MARINE JOINER
     while true do
-        if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
+        if LocalPlayer.Team and (LocalPlayer.Team.Name == "Marines" or LocalPlayer.Team.Name == "Marine") then
             StatusLabel.Text = "Status: Marines verified! Scans active."
             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
             sendNotification("Successfully joined Marines team!", Color3.fromRGB(0, 255, 120))
@@ -266,18 +280,15 @@ task.spawn(function()
         StatusLabel.Text = "Status: Joining Marines..."
         
         pcall(function()
-            local ReplicatedStorage = game:GetService("ReplicatedStorage")
             local remotes = ReplicatedStorage:FindFirstChild("Remotes")
             if remotes then
                 local commF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
-                if commF then
-                    commF:InvokeServer("SetTeam", "Marines")
-                end
+                if commF then commF:InvokeServer("SetTeam", "Marines") end
             end
         end)
 
         pcall(function()
-            local playerGui = lp:FindFirstChild("PlayerGui")
+            local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
             local mainGui = playerGui and playerGui:FindFirstChild("Main")
             local chooseTeam = mainGui and mainGui:FindFirstChild("ChooseTeam")
             if chooseTeam then
@@ -296,25 +307,22 @@ task.spawn(function()
                 end
             end
         end)
-
         task.wait(2)
     end
     
     task.wait(1)
     
-    -- MAIN SNIPER LOOP
     while task.wait(0.2) do
         if getgenv().FruitSniperEnabled then
-            local character = lp.Character
+            local character = LocalPlayer.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChild("Humanoid")
             
             if root and humanoid and humanoid.Health > 0 then
                 
-                -- 1. OFFICIAL BANNER RAID NOTIFICATION CHECK
                 local officialRaidTriggered = false
                 if getgenv().AutoPirateRaid then
-                    local playerGui = lp:FindFirstChild("PlayerGui")
+                    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
                     if playerGui then
                         local possibleUIs = {"Transit", "Notifications", "Main", "Banner"}
                         for _, uiName in pairs(possibleUIs) do
@@ -341,10 +349,10 @@ task.spawn(function()
                     StatusLabel.Text = "Status: RAID NOTIFICATION FOUND!"
                     sendNotification("Raid banner detected! Heading to COTS.", Color3.fromRGB(255, 140, 0))
                     
-                    ensureHakiActive(character)
+                    activateHaki()
 
                     if not character:FindFirstChildOfClass("Tool") then
-                        local backpack = lp:FindFirstChild("Backpack")
+                        local backpack = LocalPlayer:FindFirstChild("Backpack")
                         if backpack then
                             local tool = backpack:FindFirstChildOfClass("Tool")
                             if tool then humanoid:EquipTool(tool) end
@@ -353,10 +361,9 @@ task.spawn(function()
 
                     root.CFrame = CFrame.new(-5053, 325, -3155)
                     
-                    vu:CaptureController()
-                    vu:ClickButton1(Vector2.new(0,0))
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton1(Vector2.new(0,0))
                 else
-                    -- 2. INSTANT FRUIT SCAN
                     local targetFruit = nil
                     for _, item in pairs(workspace:GetChildren()) do
                         local nameLower = string.lower(item.Name)
@@ -371,7 +378,6 @@ task.spawn(function()
                         end
                     end
 
-                    -- 3. FRUIT PICKUP & STORE ROUTINE
                     if targetFruit then
                         getgenv().AutoHopEnabled = false
                         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
@@ -395,7 +401,7 @@ task.spawn(function()
                         end
                         
                         if not holdingFruit then
-                            local backpack = lp:FindFirstChild("Backpack")
+                            local backpack = LocalPlayer:FindFirstChild("Backpack")
                             if backpack then
                                 for _, tool in pairs(backpack:GetChildren()) do
                                     if tool:IsA("Tool") and string.find(string.lower(tool.Name), "fruit") then
@@ -413,7 +419,6 @@ task.spawn(function()
                         
                         local fruitNameToStore = holdingFruit and holdingFruit.Name or targetFruit.Name
                         pcall(function()
-                            local ReplicatedStorage = game:GetService("ReplicatedStorage")
                             local commF = ReplicatedStorage.Remotes:FindFirstChild("CommF_") or ReplicatedStorage.Remotes:FindFirstChild("CommF")
                             if commF then
                                 commF:InvokeServer("StoreFruit", fruitNameToStore, holdingFruit or targetFruit)
@@ -423,11 +428,9 @@ task.spawn(function()
                         task.wait(2)
                         getgenv().AutoHopEnabled = true
                     else
-                        -- 4. SERVER HOP
-                        if getgenv().AutoHopEnabled then
+                        if getgenv().AutoHopEnabled and not isHopping then
                             StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                             StatusLabel.Text = "Status: Server clear. Hopping..."
-                            task.wait(0.5)
                             hopServer()
                         end
                     end

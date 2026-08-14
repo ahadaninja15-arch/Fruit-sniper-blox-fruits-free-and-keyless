@@ -6,7 +6,7 @@ repeat task.wait(0.5) until game.Players.LocalPlayer and game.Players.LocalPlaye
 getgenv().FruitSniperEnabled = true
 getgenv().AutoHopEnabled = true
 getgenv().AntiAFKEnabled = true
-getgenv().AutoPirateRaid = true   -- Auto fights Castle on the Sea (SAC) pirate raid events only
+getgenv().AutoPirateRaid = true   -- Auto fights Castle on the Sea pirate raid events only
 
 -- TARGET FILTERS (Strict Matching Keys)
 local TargetFruits = {
@@ -39,6 +39,7 @@ local MinimizeButton = Instance.new("TextButton")
 local ControlButton = Instance.new("TextButton")
 local StatusLabel = Instance.new("TextLabel")
 local OpenButton = Instance.new("TextButton")
+local NotificationLabel = Instance.new("TextLabel")
 
 ScreenGui.Name = "NinjaPremiumSniper"
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
@@ -48,7 +49,7 @@ MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
-MainFrame.Size = UDim2.new(0, 260, 0, 140)
+MainFrame.Size = UDim2.new(0, 260, 0, 165)
 MainFrame.BorderSizePixel = 2
 MainFrame.Active = true
 MainFrame.Draggable = true 
@@ -89,7 +90,7 @@ OpenButton.Draggable = true
 ControlButton.Name = "ControlButton"
 ControlButton.Parent = MainFrame
 ControlButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-ControlButton.Position = UDim2.new(0.05, 0, 0.28, 0)
+ControlButton.Position = UDim2.new(0.05, 0, 0.22, 0)
 ControlButton.Size = UDim2.new(0.9, 0, 0, 30)
 ControlButton.Font = Enum.Font.SourceSansBold
 ControlButton.Text = "SCRIPT STATUS: ACTIVE"
@@ -99,13 +100,33 @@ ControlButton.TextSize = 14
 StatusLabel.Name = "StatusLabel"
 StatusLabel.Parent = MainFrame
 StatusLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-StatusLabel.Position = UDim2.new(0.05, 0, 0.55, 0)
-StatusLabel.Size = UDim2.new(0.9, 0, 0, 50)
+StatusLabel.Position = UDim2.new(0.05, 0, 0.43, 0)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 40)
 StatusLabel.Font = Enum.Font.SourceSansItalic
-StatusLabel.Text = "Status: Initializing team joiner..."
+StatusLabel.Text = "Status: Initializing..."
 StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
 StatusLabel.TextSize = 12
 StatusLabel.TextWrapped = true
+
+NotificationLabel.Name = "NotificationLabel"
+NotificationLabel.Parent = MainFrame
+NotificationLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+NotificationLabel.Position = UDim2.new(0.05, 0, 0.70, 0)
+NotificationLabel.Size = UDim2.new(0.9, 0, 0, 40)
+NotificationLabel.Font = Enum.Font.SourceSansBold
+NotificationLabel.Text = "Notif: Ready for scanning."
+NotificationLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
+NotificationLabel.TextSize = 11
+NotificationLabel.TextWrapped = true
+
+-- Notification Function
+local function sendNotification(message, color)
+    NotificationLabel.Text = "Notif: " .. message
+    if color then
+        NotificationLabel.TextColor3 = color
+    end
+    print("[Ninja Sniper Notif]: " .. message)
+end
 
 -- Minimize / Open Logic
 MinimizeButton.MouseButton1Click:Connect(function()
@@ -127,12 +148,14 @@ ControlButton.MouseButton1Click:Connect(function()
         ControlButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
         StatusLabel.Text = "Status: Active..."
         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+        sendNotification("Script activated!", Color3.fromRGB(0, 255, 150))
     else
         getgenv().AutoHopEnabled = false
         ControlButton.Text = "SCRIPT STATUS: DEACTIVATED"
         ControlButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
         StatusLabel.Text = "Status: Paused."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        sendNotification("Script paused.", Color3.fromRGB(255, 100, 100))
     end
 end)
 
@@ -152,6 +175,7 @@ local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
     StatusLabel.Text = "Status: Fetching public servers..."
+    sendNotification("Searching for a better server...", Color3.fromRGB(255, 165, 0))
     task.wait(0.5)
     
     local Http = game:GetService("HttpService")
@@ -159,7 +183,7 @@ local function hopServer()
     
     VisitedServers[game.JobId] = true
     
-    local ApiUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+    local ApiUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
     local rawData = nil
     
     pcall(function()
@@ -187,7 +211,8 @@ local function hopServer()
                 -- Target 3-8 player servers safely
                 if currentP >= 3 and currentP <= 8 and serverId ~= game.JobId and not VisitedServers[serverId] then
                     VisitedServers[serverId] = true
-                    StatusLabel.Text = "Status: Hopping to server (" .. currentP .. "/8 players)..."
+                    StatusLabel.Text = "Status: Hopping (" .. currentP .. "/8 players)..."
+                    sendNotification("Hopping to server with " .. currentP .. " players!", Color3.fromRGB(0, 255, 200))
                     
                     local tpSuccess = pcall(function()
                         Teleport:TeleportToPlaceInstance(game.PlaceId, serverId, game.Players.LocalPlayer)
@@ -211,6 +236,7 @@ game:GetService("TeleportService").TeleportInitFailed:Connect(function(player, t
     if player == game.Players.LocalPlayer then
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
         StatusLabel.Text = "Status: Restricted server hit. Retrying..."
+        sendNotification("Restricted server block hit, retrying hop...", Color3.fromRGB(255, 80, 80))
         task.wait(1)
         hopServer()
     end
@@ -225,6 +251,7 @@ task.spawn(function()
         if lp.Team and (lp.Team.Name == "Marines" or lp.Team.Name == "Marine") then
             StatusLabel.Text = "Status: Marines verified! Scans active."
             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+            sendNotification("Successfully joined Marines team!", Color3.fromRGB(0, 255, 120))
             break
         end
 
@@ -275,7 +302,7 @@ task.spawn(function()
             local humanoid = character and character:FindFirstChild("Humanoid")
             
             if root and humanoid and humanoid.Health > 0 then
-                -- 1. STRICT CASTLE ON THE SEA (SAC) PIRATE RAID DETECTOR
+                -- 1. STRICT CASTLE ON THE SEA PIRATE RAID DETECTOR
                 local raidEnemies = {}
                 if getgenv().AutoPirateRaid then
                     local enemies = workspace:FindFirstChild("Enemies")
@@ -285,11 +312,9 @@ task.spawn(function()
                             local hum = enemy:FindFirstChild("Humanoid")
                             
                             if eRoot and hum and hum.Health > 0 then
-                                -- Check if the enemy is physically located specifically around Castle on the Sea (SAC)
-                                local distToSAC = (eRoot.Position - Vector3.new(-5053, 315, -3155)).Magnitude
-                                if distToSAC <= 350 then
+                                local distToCastle = (eRoot.Position - Vector3.new(-5053, 315, -3155)).Magnitude
+                                if distToCastle <= 350 then
                                     local name = string.lower(enemy.Name)
-                                    -- Only target exact Castle / Sea Event pirate raid spawn titles
                                     if string.find(name, "pirate") or string.find(name, "island boy") or string.find(name, "captain elephant") or string.find(name, "mythological pirate") then
                                         table.insert(raidEnemies, enemy)
                                     end
@@ -302,7 +327,8 @@ task.spawn(function()
                 if #raidEnemies > 0 then
                     getgenv().AutoHopEnabled = false
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
-                    StatusLabel.Text = "Status: SAC RAID ACTIVE! Fighting " .. #raidEnemies .. " Raiders..."
+                    StatusLabel.Text = "Status: CASTLE RAID ACTIVE!"
+                    sendNotification("Castle Raid active! Fighting " .. #raidEnemies .. " raiders.", Color3.fromRGB(255, 140, 0))
                     
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = lp:FindFirstChild("Backpack")
@@ -312,10 +338,10 @@ task.spawn(function()
                         end
                     end
 
-                    -- Move right above the first target normally without any floating body velocity locks
+                    -- Hover safely above the target (10 studs up) to avoid enemy melee hits
                     local baseTarget = raidEnemies[1]:FindFirstChild("HumanoidRootPart")
                     if baseTarget then
-                        root.CFrame = CFrame.new(baseTarget.Position.X, baseTarget.Position.Y + 6, baseTarget.Position.Z)
+                        root.CFrame = baseTarget.CFrame + Vector3.new(0, 10, 0)
                     end
                     
                     vu:CaptureController()
@@ -340,7 +366,8 @@ task.spawn(function()
                     if targetFruit then
                         getgenv().AutoHopEnabled = false
                         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
-                        StatusLabel.Text = "Status: TARGET FOUND (" .. targetFruit.Name .. ")!"
+                        StatusLabel.Text = "Status: TARGET FOUND!"
+                        sendNotification("Found target fruit: " .. targetFruit.Name .. "!", Color3.fromRGB(0, 255, 120))
                         
                         if targetFruit:IsA("Model") then
                             root.CFrame = targetFruit:GetPivot()
@@ -372,7 +399,8 @@ task.spawn(function()
                             end
                         end
 
-                        StatusLabel.Text = "Status: Storing " .. targetFruit.Name .. "..."
+                        StatusLabel.Text = "Status: Storing fruit..."
+                        sendNotification("Storing " .. targetFruit.Name .. " in inventory...", Color3.fromRGB(0, 220, 255))
                         
                         local fruitNameToStore = holdingFruit and holdingFruit.Name or targetFruit.Name
                         pcall(function()

@@ -213,26 +213,62 @@ task.spawn(function()
     end
 end)
 
--- OPTIMIZED PROXY SERVER HOPPER
-local isHopping = false -- DEBOUNCE PREVENTS CRASHING
+-- ADVANCED SERVER HOPPER (RESTRICTED & GHOST SERVER BYPASS)
+local isHopping = false 
+
+local function getBlacklist()
+    if isfile and readfile and isfile("NinjaServerBlacklist.json") then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile("NinjaServerBlacklist.json"))
+        end)
+        if success and type(data) == "table" then return data end
+    end
+    return {}
+end
+
+local function saveBlacklist(tbl)
+    if writefile then
+        pcall(function()
+            writefile("NinjaServerBlacklist.json", HttpService:JSONEncode(tbl))
+        end)
+    end
+end
+
+local serverBlacklist = getBlacklist()
+serverBlacklist[game.JobId] = os.time() 
+
+for id, timeAdded in pairs(serverBlacklist) do
+    if os.time() - timeAdded > 1800 then
+        serverBlacklist[id] = nil
+    end
+end
+saveBlacklist(serverBlacklist)
+
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled or isHopping then return end
     isHopping = true 
+    
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Scanning safe active servers..."
-    sendNotification("Filtering player counts...", Color3.fromRGB(255, 165, 0))
+    StatusLabel.Text = "Status: Bypassing restricted servers..."
+    sendNotification("Scanning for healthy servers...", Color3.fromRGB(255, 165, 0))
     
     local success, err = pcall(function()
         local validServers = {}
-        local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
+        local cursors = {"", "&cursor=1", "&cursor=2"} 
+        local randomCursor = cursors[math.random(1, #cursors)]
+        
+        local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100" .. randomCursor
         local response = game:HttpGet(url)
         local data = HttpService:JSONDecode(response)
         
         if data and data.data then
             for _, s in pairs(data.data) do
-                if type(s) == "table" and s.playing and s.maxPlayers and s.id then
-                    if s.playing >= 3 and s.playing <= (s.maxPlayers - 3) and s.id ~= game.JobId then
-                        table.insert(validServers, s.id)
+                if type(s) == "table" and s.id and s.playing and s.maxPlayers then
+                    -- STRICT FILTER: Valid ping, not blacklisted, not current, 6 to 10 players
+                    if s.ping and not serverBlacklist[s.id] and s.id ~= game.JobId then
+                        if s.playing >= 6 and s.playing <= (s.maxPlayers - 2) then
+                            table.insert(validServers, s.id)
+                        end
                     end
                 end
             end
@@ -240,16 +276,19 @@ local function hopServer()
         
         if #validServers > 0 then
             local targetId = validServers[math.random(1, #validServers)]
-            StatusLabel.Text = "Status: Teleporting to verified server..."
+            serverBlacklist[targetId] = os.time()
+            saveBlacklist(serverBlacklist)
+            
+            StatusLabel.Text = "Status: Teleporting safely..."
             TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, LocalPlayer)
         else
-            sendNotification("Proxy empty, trying default queue...", Color3.fromRGB(255, 165, 0))
+            sendNotification("Proxy empty, trying deep search...", Color3.fromRGB(255, 165, 0))
             TeleportService:Teleport(game.PlaceId, LocalPlayer)
         end
     end)
     
     if not success then
-        sendNotification("Proxy timeout, using standard queue...", Color3.fromRGB(255, 100, 100))
+        sendNotification("Proxy timeout, standard queue...", Color3.fromRGB(255, 100, 100))
         pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
     end
     
@@ -261,7 +300,7 @@ TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, erro
     if player == LocalPlayer then
         isHopping = false
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Server rejected, finding another..."
+        StatusLabel.Text = "Status: Hop rejected, grabbing new ID..."
         task.wait(1)
         hopServer()
     end

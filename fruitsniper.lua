@@ -10,13 +10,23 @@ getgenv().AutoPirateRaid = true
 getgenv().AutoBusoHaki = true   
 getgenv().AutoKenHaki = false   
 
--- TARGET FILTERS
+-- TARGET FRUIT FILTERS
 local TargetFruits = {
     ["buddha"] = true, ["portal"] = true, ["lightning"] = true,
     ["pain"] = true, ["kitsune"] = true, ["dragon"] = true,
     ["leopard"] = true, ["dough"] = true, ["t-rex"] = true,
     ["mammoth"] = true, ["spirit"] = true, ["control"] = true,
     ["venom"] = true, ["shadow"] = true, ["gravity"] = true
+}
+
+-- SEA 3 ISLAND COORDINATES (MEMBER/FAST TRAVEL)
+local Sea3Islands = {
+    ["Castles on the Sea"] = CFrame.new(-5053, 325, -3155),
+    ["Floating Turtle"] = CFrame.new(-12474, 331, -8898),
+    ["Hydra Island"] = CFrame.new(5752, 610, -297),
+    ["Mansion"] = CFrame.new(-12462, 374, -7552),
+    ["Haunted Castle"] = CFrame.new(-9515, 142, 5525),
+    ["Sea of Treats"] = CFrame.new(-2009, 49, -10447)
 }
 
 -- SERVICES DECLARATION
@@ -27,15 +37,36 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = game.Players.LocalPlayer
 
--- SETUP DRAGGABLE UI FRAMEWORK
+-- SETUP CLEAN, MODERN DARK UI FRAMEWORK
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
+local UICornerMain = Instance.new("UICorner")
+local TopBar = Instance.new("Frame")
+local UICornerTop = Instance.new("UICorner")
 local Title = Instance.new("TextLabel")
 local MinimizeButton = Instance.new("TextButton")
+
+local Container = Instance.new("ScrollingFrame")
+local UIListLayout = Instance.new("UIListLayout")
+
 local ControlButton = Instance.new("TextButton")
+local UICornerBtn1 = Instance.new("UICorner")
+
 local StatusLabel = Instance.new("TextLabel")
-local OpenButton = Instance.new("TextButton")
+local UICornerStatus = Instance.new("UICorner")
+
 local NotificationLabel = Instance.new("TextLabel")
+local UICornerNotif = Instance.new("UICorner")
+
+-- ISLAND TELEPORT DROPDOWN / BUTTON CONTAINER
+local IslandContainer = Instance.new("Frame")
+local UICornerIsland = Instance.new("UICorner")
+local IslandTitle = Instance.new("TextLabel")
+local IslandScroll = Instance.new("ScrollingFrame")
+local IslandLayout = Instance.new("UIListLayout")
+
+local OpenButton = Instance.new("TextButton")
+local UICornerOpen = Instance.new("UICorner")
 
 ScreenGui.Name = "NinjaPremiumSniper"
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
@@ -43,82 +74,173 @@ if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("Player
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
-MainFrame.Size = UDim2.new(0, 260, 0, 165)
-MainFrame.BorderSizePixel = 2
+MainFrame.Size = UDim2.new(0, 270, 0, 320)
+MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true 
 
+UICornerMain.CornerRadius = UDim.new(0, 8)
+UICornerMain.Parent = MainFrame
+
+TopBar.Name = "TopBar"
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+TopBar.Size = UDim2.new(1, 0, 0, 32)
+TopBar.BorderSizePixel = 0
+
+UICornerTop.CornerRadius = UDim.new(0, 8)
+UICornerTop.Parent = TopBar
+
 Title.Name = "Title"
-Title.Parent = MainFrame
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-Title.Size = UDim2.new(1, -30, 0, 30)
-Title.Font = Enum.Font.SourceSansBold
-Title.Text = " NINJA MYTHIC & RAID SNIPER"
+Title.Parent = TopBar
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "NINJA MYTHIC & RAID SNIPER"
 Title.TextColor3 = Color3.fromRGB(255, 215, 0)
-Title.TextSize = 13
+Title.TextSize = 11
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
 MinimizeButton.Name = "MinimizeButton"
-MinimizeButton.Parent = MainFrame
-MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-MinimizeButton.Position = UDim2.new(1, -30, 0, 0)
-MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
-MinimizeButton.Font = Enum.Font.SourceSansBold
+MinimizeButton.Parent = TopBar
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+MinimizeButton.Position = UDim2.new(1, -28, 0, 4)
+MinimizeButton.Size = UDim2.new(0, 24, 0, 24)
+MinimizeButton.Font = Enum.Font.GothamBold
 MinimizeButton.Text = "-"
 MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeButton.TextSize = 18
+MinimizeButton.TextSize = 14
+local UICornerMin = Instance.new("UICorner")
+UICornerMin.CornerRadius = UDim.new(0, 4)
+UICornerMin.Parent = MinimizeButton
 
 OpenButton.Name = "OpenButton"
 OpenButton.Parent = ScreenGui
-OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+OpenButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 OpenButton.Position = UDim2.new(0.05, 0, 0.05, 0)
-OpenButton.Size = UDim2.new(0, 80, 0, 30)
-OpenButton.Font = Enum.Font.SourceSansBold
+OpenButton.Size = UDim2.new(0, 85, 0, 32)
+OpenButton.Font = Enum.Font.GothamBold
 OpenButton.Text = "OPEN UI"
 OpenButton.TextColor3 = Color3.fromRGB(255, 215, 0)
 OpenButton.TextSize = 12
 OpenButton.Visible = false
 OpenButton.Active = true
 OpenButton.Draggable = true
+UICornerOpen.CornerRadius = UDim.new(0, 6)
+UICornerOpen.Parent = OpenButton
+
+Container.Name = "Container"
+Container.Parent = MainFrame
+Container.BackgroundTransparency = 1
+Container.Position = UDim2.new(0, 10, 0, 40)
+Container.Size = UDim2.new(1, -20, 1, -48)
+Container.CanvasSize = UDim2.new(0, 0, 0, 330)
+Container.ScrollBarThickness = 3
+
+UIListLayout.Parent = Container
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
 
 ControlButton.Name = "ControlButton"
-ControlButton.Parent = MainFrame
-ControlButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-ControlButton.Position = UDim2.new(0.05, 0, 0.22, 0)
-ControlButton.Size = UDim2.new(0.9, 0, 0, 30)
-ControlButton.Font = Enum.Font.SourceSansBold
+ControlButton.Parent = Container
+ControlButton.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+ControlButton.Size = UDim2.new(1, 0, 0, 32)
+ControlButton.Font = Enum.Font.GothamBold
 ControlButton.Text = "SCRIPT STATUS: ACTIVE"
 ControlButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ControlButton.TextSize = 14
+ControlButton.TextSize = 12
+UICornerBtn1.CornerRadius = UDim.new(0, 6)
+UICornerBtn1.Parent = ControlButton
 
 StatusLabel.Name = "StatusLabel"
-StatusLabel.Parent = MainFrame
-StatusLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-StatusLabel.Position = UDim2.new(0.05, 0, 0.43, 0)
-StatusLabel.Size = UDim2.new(0.9, 0, 0, 40)
-StatusLabel.Font = Enum.Font.SourceSansItalic
+StatusLabel.Parent = Container
+StatusLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+StatusLabel.Size = UDim2.new(1, 0, 0, 40)
+StatusLabel.Font = Enum.Font.GothamMedium
 StatusLabel.Text = "Status: Initializing..."
 StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-StatusLabel.TextSize = 12
+StatusLabel.TextSize = 11
 StatusLabel.TextWrapped = true
+UICornerStatus.CornerRadius = UDim.new(0, 6)
+UICornerStatus.Parent = StatusLabel
 
 NotificationLabel.Name = "NotificationLabel"
-NotificationLabel.Parent = MainFrame
+NotificationLabel.Parent = Container
 NotificationLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-NotificationLabel.Position = UDim2.new(0.05, 0, 0.70, 0)
-NotificationLabel.Size = UDim2.new(0.9, 0, 0, 40)
-NotificationLabel.Font = Enum.Font.SourceSansBold
+NotificationLabel.Size = UDim2.new(1, 0, 0, 40)
+NotificationLabel.Font = Enum.Font.GothamMedium
 NotificationLabel.Text = "Notif: Ready for scanning."
 NotificationLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
 NotificationLabel.TextSize = 11
 NotificationLabel.TextWrapped = true
+UICornerNotif.CornerRadius = UDim.new(0, 6)
+UICornerNotif.Parent = NotificationLabel
+
+-- ISLAND TELEPORT SYSTEM PANEL
+IslandContainer.Name = "IslandContainer"
+IslandContainer.Parent = Container
+IslandContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+IslandContainer.Size = UDim2.new(1, 0, 0, 175)
+UICornerIsland.CornerRadius = UDim.new(0, 6)
+UICornerIsland.Parent = IslandContainer
+
+IslandTitle.Name = "IslandTitle"
+IslandTitle.Parent = IslandContainer
+IslandTitle.BackgroundTransparency = 1
+IslandTitle.Position = UDim2.new(0, 8, 0, 4)
+IslandTitle.Size = UDim2.new(1, -16, 0, 20)
+IslandTitle.Font = Enum.Font.GothamBold
+IslandTitle.Text = "FAST ISLAND TELEPORT"
+IslandTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
+IslandTitle.TextSize = 11
+IslandTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+IslandScroll.Name = "IslandScroll"
+IslandScroll.Parent = IslandContainer
+IslandScroll.BackgroundTransparency = 1
+IslandScroll.Position = UDim2.new(0, 6, 0, 28)
+IslandScroll.Size = UDim2.new(1, -12, 1, -34)
+IslandScroll.CanvasSize = UDim2.new(0, 0, 0, 210)
+IslandScroll.ScrollBarThickness = 2
+
+IslandLayout.Parent = IslandScroll
+IslandLayout.SortOrder = Enum.SortOrder.LayoutOrder
+IslandLayout.Padding = UDim.new(0, 4)
 
 local function sendNotification(message, color)
     NotificationLabel.Text = "Notif: " .. message
     if color then NotificationLabel.TextColor3 = color end
     print("[Ninja Sniper Notif]: " .. message)
+end
+
+-- Populate Island Buttons Dynamically
+for islandName, cf in pairs(Sea3Islands) do
+    local btn = Instance.new("TextButton")
+    btn.Name = islandName .. "Btn"
+    btn.Parent = IslandScroll
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+    btn.Size = UDim2.new(1, 0, 0, 28)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Text = "Teleport: " .. islandName
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 10
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = cf
+            sendNotification("Teleported to " .. islandName, Color3.fromRGB(0, 255, 150))
+        else
+            sendNotification("Character not loaded!", Color3.fromRGB(255, 100, 100))
+        end
+    end)
 end
 
 MinimizeButton.MouseButton1Click:Connect(function()
@@ -136,7 +258,7 @@ ControlButton.MouseButton1Click:Connect(function()
     if getgenv().FruitSniperEnabled then
         getgenv().AutoHopEnabled = true
         ControlButton.Text = "SCRIPT STATUS: ACTIVE"
-        ControlButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        ControlButton.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
         StatusLabel.Text = "Status: Active..."
         StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
         sendNotification("Script activated!", Color3.fromRGB(0, 255, 150))
@@ -213,7 +335,7 @@ task.spawn(function()
     end
 end)
 
--- BULLETPROOF SERVER HOPPER (RESTRICTED BYPASS)
+-- ROBUST SERVER HOPPER (FIXED ENDPOINT & RETRY FLOW)
 local isHopping = false 
 
 local function getBlacklist()
@@ -249,15 +371,14 @@ local function hopServer()
     isHopping = true 
     
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Bypassing restricted servers..."
-    sendNotification("Scanning for clean servers...", Color3.fromRGB(255, 165, 0))
+    StatusLabel.Text = "Status: Finding clean server..."
+    sendNotification("Scanning public API...", Color3.fromRGB(255, 165, 0))
     
     local success, err = pcall(function()
         local validServers = {}
         local cursor = ""
         
-        -- Pull multiple pages through RoProxy to ensure we find healthy public servers
-        for i = 1, 2 do
+        for i = 1, 3 do
             local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
             local response = game:HttpGet(url)
             local data = HttpService:JSONDecode(response)
@@ -265,9 +386,8 @@ local function hopServer()
             if data and data.data then
                 for _, s in pairs(data.data) do
                     if type(s) == "table" and s.id and s.playing and s.maxPlayers then
-                        -- Strict validation: Must not be current, not blacklisted, playing between 4 and max-1 players
                         if s.id ~= game.JobId and not serverBlacklist[s.id] then
-                            if s.playing >= 4 and s.playing < s.maxPlayers then
+                            if s.playing >= 3 and s.playing < s.maxPlayers then
                                 table.insert(validServers, s.id)
                             end
                         end
@@ -280,7 +400,7 @@ local function hopServer()
             else
                 break
             end
-            task.wait(0.1)
+            task.wait(0.05)
         end
         
         if #validServers > 0 then
@@ -288,31 +408,31 @@ local function hopServer()
             serverBlacklist[targetId] = os.time()
             saveBlacklist(serverBlacklist)
             
-            StatusLabel.Text = "Status: Teleporting safely..."
+            StatusLabel.Text = "Status: Teleporting..."
             TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, LocalPlayer)
         else
-            -- Clear blacklist and instantly retry if pool runs out
-            serverBlacklist = {}
-            saveBlacklist(serverBlacklist)
-            isHopping = false
-            task.wait(1)
-            hopServer()
+            -- If no servers found with filters, fallback to standard Roblox public queue
+            StatusLabel.Text = "Status: Fallback queue hop..."
+            TeleportService:Teleport(game.PlaceId, LocalPlayer)
         end
     end)
     
     if not success then
-        sendNotification("Hop error, retrying...", Color3.fromRGB(255, 100, 100))
+        sendNotification("Hop exception, retrying...", Color3.fromRGB(255, 100, 100))
         task.wait(2)
         isHopping = false
-        hopServer()
+        pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
     end
+    
+    task.wait(8)
+    isHopping = false 
 end
 
 TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
     if player == LocalPlayer then
         isHopping = false
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Restricted server avoided, hopping..."
+        StatusLabel.Text = "Status: Hop rejected, grabbing new ID..."
         task.wait(1)
         hopServer()
     end

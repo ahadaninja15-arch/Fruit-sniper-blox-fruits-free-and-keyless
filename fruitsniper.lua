@@ -6,7 +6,7 @@ repeat task.wait(0.5) until game.Players.LocalPlayer and game.Players.LocalPlaye
 getgenv().FruitSniperEnabled = true
 getgenv().AutoHopEnabled = true
 getgenv().AntiAFKEnabled = true
-getgenv().AutoPirateRaid = true   -- Auto fights Castle on the Sea pirate raid events only
+getgenv().AutoPirateRaid = true
 
 -- TARGET FILTERS (Strict Matching Keys)
 local TargetFruits = {
@@ -14,7 +14,6 @@ local TargetFruits = {
     ["portal"] = true,
     ["lightning"] = true,
     ["pain"] = true,
-    -- Mythicals
     ["kitsune"] = true,
     ["dragon"] = true,
     ["leopard"] = true,
@@ -116,7 +115,6 @@ NotificationLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
 NotificationLabel.TextSize = 11
 NotificationLabel.TextWrapped = true
 
--- Notification Function
 local function sendNotification(message, color)
     NotificationLabel.Text = "Notif: " .. message
     if color then
@@ -125,7 +123,6 @@ local function sendNotification(message, color)
     print("[Ninja Sniper Notif]: " .. message)
 end
 
--- Minimize / Open Logic
 MinimizeButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
     OpenButton.Visible = true
@@ -136,7 +133,6 @@ OpenButton.MouseButton1Click:Connect(function()
     OpenButton.Visible = false
 end)
 
--- Toggle System State
 ControlButton.MouseButton1Click:Connect(function()
     getgenv().FruitSniperEnabled = not getgenv().FruitSniperEnabled
     if getgenv().FruitSniperEnabled then
@@ -156,7 +152,6 @@ ControlButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Anti-AFK Engine
 local vu = game:GetService("VirtualUser")
 game.Players.LocalPlayer.Idled:Connect(function()
     if getgenv().AntiAFKEnabled then
@@ -165,35 +160,95 @@ game.Players.LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- BULLETPROOF PUBLIC SERVER HOPPER
+-- **CRITICAL FIX: PROXY ADDED FOR ROBLOX API** 
+-- Standard Roblox API endpoints block internal game:HttpGet calls (TrustCheck). 
+-- This uses roproxy so Delta can successfully read the player counts without silently failing.
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
 local function hopServer()
     if not getgenv().FruitSniperEnabled or not getgenv().AutoHopEnabled then return end
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Finding open public server..."
-    sendNotification("Switching to an open server...", Color3.fromRGB(255, 165, 0))
+    StatusLabel.Text = "Status: Scanning active servers via proxy..."
+    sendNotification("Checking player counts...", Color3.fromRGB(255, 165, 0))
     
-    local TeleportService = game:GetService("TeleportService")
-    local success = false
+    local success, err = pcall(function()
+        local validServers = {}
+        local cursor = ""
+        
+        repeat
+            -- Used roproxy.com to bypass TrustCheck limitations in executors
+            local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
+            local response = game:HttpGet(url)
+            local data = HttpService:JSONDecode(response)
+            
+            if data and data.data then
+                for _, s in pairs(data.data) do
+                    -- Check if fields exist and verify player count is safely below maximum limit
+                    if type(s) == "table" and s.playing and s.maxPlayers and s.id then
+                        -- Ignores servers that are full or have 1 slot left (must have at least 2 open slots and not current job ID)
+                        if s.playing < (s.maxPlayers - 2) and s.id ~= game.JobId then
+                            table.insert(validServers, s.id)
+                        end
+                    end
+                end
+            end
+            
+            cursor = data.nextPageCursor
+            task.wait(0.2)
+        until #validServers > 0 or not cursor or cursor == ""
+        
+        if #validServers > 0 then
+            local targetId = validServers[math.random(1, #validServers)]
+            StatusLabel.Text = "Status: Joining verified open server..."
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, game.Players.LocalPlayer)
+        else
+            -- If proxy fails entirely, fallback to native queue
+            TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
+        end
+    end)
     
-    repeat
+    if not success then
+        sendNotification("Proxy timeout, using standard queue...", Color3.fromRGB(255, 100, 100))
         pcall(function()
             TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
-            success = true
         end)
-        if not success then task.wait(2) end
-    until success
+    end
     
     task.wait(6)
 end
 
-game:GetService("TeleportService").TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
     if player == game.Players.LocalPlayer then
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Server full/restricted, retrying..."
+        StatusLabel.Text = "Status: Server rejected, finding another..."
         task.wait(1)
         hopServer()
     end
 end)
+
+-- **SAFE HAKI TOGGLER**
+local function ensureHakiActive(character)
+    pcall(function()
+        if not character:FindFirstChild("HasBuso") and not character:FindFirstChild("Buso") then
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+            if remotes then
+                local commF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
+                if commF then
+                    commF:InvokeServer("Buso")
+                end
+            end
+            
+            local vim = game:GetService("VirtualInputManager")
+            if vim then
+                vim:SendKeyEvent(true, Enum.KeyCode.J, false, game)
+                task.wait(0.05)
+                vim:SendKeyEvent(false, Enum.KeyCode.J, false, game)
+            end
+        end
+    end)
+end
 
 -- PRIMARY EXECUTION THREAD
 task.spawn(function()
@@ -248,7 +303,7 @@ task.spawn(function()
     task.wait(1)
     
     -- MAIN SNIPER LOOP
-    while task.wait(0.15) do
+    while task.wait(0.2) do
         if getgenv().FruitSniperEnabled then
             local character = lp.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -256,53 +311,37 @@ task.spawn(function()
             
             if root and humanoid and humanoid.Health > 0 then
                 
-                -- 1. ABSOLUTE STRICT ENTITY CHECK (Ignores all normal NPCs, ONLY triggers on actual active pirate raid spawns)
-                local raidEnemies = {}
+                -- 1. OFFICIAL BANNER RAID NOTIFICATION CHECK
+                local officialRaidTriggered = false
                 if getgenv().AutoPirateRaid then
-                    local enemies = workspace:FindFirstChild("Enemies")
-                    if enemies then
-                        for _, enemy in pairs(enemies:GetChildren()) do
-                            local eRoot = enemy:FindFirstChild("HumanoidRootPart")
-                            local hum = enemy:FindFirstChild("Humanoid")
-                            
-                            if eRoot and hum and hum.Health > 0 then
-                                local distToCastle = (eRoot.Position - Vector3.new(-5053, 315, -3155)).Magnitude
-                                -- Must be tightly clustered right at Castle on the Sea courtyard/spawn
-                                if distToCastle <= 200 then
-                                    local name = string.lower(enemy.Name)
-                                    -- STRICT check: Only target actual event boss/mob names, ignoring normal Sea 3 NPCs completely
-                                    if name == "pirate" or name == "island boy" or name == "captain elephant" or name == "mythological pirate" or string.find(name, "pirate raid") then
-                                        table.insert(raidEnemies, enemy)
+                    local playerGui = lp:FindFirstChild("PlayerGui")
+                    if playerGui then
+                        local possibleUIs = {"Transit", "Notifications", "Main", "Banner"}
+                        for _, uiName in pairs(possibleUIs) do
+                            local container = playerGui:FindFirstChild(uiName)
+                            if container then
+                                for _, desc in pairs(container:GetDescendants()) do
+                                    if desc:IsA("TextLabel") and desc.Visible then
+                                        local msg = string.lower(desc.Text)
+                                        if string.find(msg, "pirate raid has started") or string.find(msg, "pirates have arrived at the castle") then
+                                            officialRaidTriggered = true
+                                            break
+                                        end
                                     end
                                 end
                             end
+                            if officialRaidTriggered then break end
                         end
                     end
                 end
 
-                -- ONLY ATTACK IF 2 OR MORE EVENT RAID MOBS ACTUALLY EXIST AT THE SPOT (Prevents false triggers on random stuck NPCs)
-                if #raidEnemies >= 2 then
+                if officialRaidTriggered then
                     getgenv().AutoHopEnabled = false
                     StatusLabel.TextColor3 = Color3.fromRGB(255, 140, 0)
-                    StatusLabel.Text = "Status: RAID CONFIRMED!"
-                    sendNotification("Confirmed raid! Fighting " .. #raidEnemies .. " raiders.", Color3.fromRGB(255, 140, 0))
+                    StatusLabel.Text = "Status: RAID NOTIFICATION FOUND!"
+                    sendNotification("Raid banner detected! Heading to COTS.", Color3.fromRGB(255, 140, 0))
                     
-                    -- GUARANTEED HAKI ACTIVATOR
-                    pcall(function()
-                        if not character:FindFirstChild("HasBuso") then
-                            local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                            local commF = ReplicatedStorage.Remotes:FindFirstChild("CommF_") or ReplicatedStorage.Remotes:FindFirstChild("CommF")
-                            if commF then
-                                commF:InvokeServer("Buso")
-                            end
-                            local vim = game:GetService("VirtualInputManager")
-                            if vim then
-                                vim:SendKeyEvent(true, Enum.KeyCode.J, false, game)
-                                task.wait(0.05)
-                                vim:SendKeyEvent(false, Enum.KeyCode.J, false, game)
-                            end
-                        end
-                    end)
+                    ensureHakiActive(character)
 
                     if not character:FindFirstChildOfClass("Tool") then
                         local backpack = lp:FindFirstChild("Backpack")
@@ -312,9 +351,7 @@ task.spawn(function()
                         end
                     end
 
-                    if raidEnemies[1]:FindFirstChild("HumanoidRootPart") then
-                        root.CFrame = raidEnemies[1].HumanoidRootPart.CFrame + Vector3.new(0, 10, 0)
-                    end
+                    root.CFrame = CFrame.new(-5053, 325, -3155)
                     
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new(0,0))
@@ -386,7 +423,7 @@ task.spawn(function()
                         task.wait(2)
                         getgenv().AutoHopEnabled = true
                     else
-                        -- 4. SAFE SERVER HOP
+                        -- 4. SERVER HOP
                         if getgenv().AutoHopEnabled then
                             StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                             StatusLabel.Text = "Status: Server clear. Hopping..."

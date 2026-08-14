@@ -19,16 +19,6 @@ local TargetFruits = {
     ["venom"] = true, ["shadow"] = true, ["gravity"] = true
 }
 
--- SEA 3 ISLAND COORDINATES (MEMBER/FAST TRAVEL)
-local Sea3Islands = {
-    ["Castles on the Sea"] = CFrame.new(-5053, 325, -3155),
-    ["Floating Turtle"] = CFrame.new(-12474, 331, -8898),
-    ["Hydra Island"] = CFrame.new(5752, 610, -297),
-    ["Mansion"] = CFrame.new(-12462, 374, -7552),
-    ["Haunted Castle"] = CFrame.new(-9515, 142, 5525),
-    ["Sea of Treats"] = CFrame.new(-2009, 49, -10447)
-}
-
 -- SERVICES DECLARATION
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
@@ -58,13 +48,6 @@ local UICornerStatus = Instance.new("UICorner")
 local NotificationLabel = Instance.new("TextLabel")
 local UICornerNotif = Instance.new("UICorner")
 
--- ISLAND TELEPORT DROPDOWN / BUTTON CONTAINER
-local IslandContainer = Instance.new("Frame")
-local UICornerIsland = Instance.new("UICorner")
-local IslandTitle = Instance.new("TextLabel")
-local IslandScroll = Instance.new("ScrollingFrame")
-local IslandLayout = Instance.new("UIListLayout")
-
 local OpenButton = Instance.new("TextButton")
 local UICornerOpen = Instance.new("UICorner")
 
@@ -76,7 +59,7 @@ MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
-MainFrame.Size = UDim2.new(0, 270, 0, 320)
+MainFrame.Size = UDim2.new(0, 270, 0, 225)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true 
@@ -137,7 +120,7 @@ Container.Parent = MainFrame
 Container.BackgroundTransparency = 1
 Container.Position = UDim2.new(0, 10, 0, 40)
 Container.Size = UDim2.new(1, -20, 1, -48)
-Container.CanvasSize = UDim2.new(0, 0, 0, 330)
+Container.CanvasSize = UDim2.new(0, 0, 0, 190)
 Container.ScrollBarThickness = 3
 
 UIListLayout.Parent = Container
@@ -179,68 +162,10 @@ NotificationLabel.TextWrapped = true
 UICornerNotif.CornerRadius = UDim.new(0, 6)
 UICornerNotif.Parent = NotificationLabel
 
--- ISLAND TELEPORT SYSTEM PANEL
-IslandContainer.Name = "IslandContainer"
-IslandContainer.Parent = Container
-IslandContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-IslandContainer.Size = UDim2.new(1, 0, 0, 175)
-UICornerIsland.CornerRadius = UDim.new(0, 6)
-UICornerIsland.Parent = IslandContainer
-
-IslandTitle.Name = "IslandTitle"
-IslandTitle.Parent = IslandContainer
-IslandTitle.BackgroundTransparency = 1
-IslandTitle.Position = UDim2.new(0, 8, 0, 4)
-IslandTitle.Size = UDim2.new(1, -16, 0, 20)
-IslandTitle.Font = Enum.Font.GothamBold
-IslandTitle.Text = "FAST ISLAND TELEPORT"
-IslandTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
-IslandTitle.TextSize = 11
-IslandTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-IslandScroll.Name = "IslandScroll"
-IslandScroll.Parent = IslandContainer
-IslandScroll.BackgroundTransparency = 1
-IslandScroll.Position = UDim2.new(0, 6, 0, 28)
-IslandScroll.Size = UDim2.new(1, -12, 1, -34)
-IslandScroll.CanvasSize = UDim2.new(0, 0, 0, 210)
-IslandScroll.ScrollBarThickness = 2
-
-IslandLayout.Parent = IslandScroll
-IslandLayout.SortOrder = Enum.SortOrder.LayoutOrder
-IslandLayout.Padding = UDim.new(0, 4)
-
 local function sendNotification(message, color)
     NotificationLabel.Text = "Notif: " .. message
     if color then NotificationLabel.TextColor3 = color end
     print("[Ninja Sniper Notif]: " .. message)
-end
-
--- Populate Island Buttons Dynamically
-for islandName, cf in pairs(Sea3Islands) do
-    local btn = Instance.new("TextButton")
-    btn.Name = islandName .. "Btn"
-    btn.Parent = IslandScroll
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-    btn.Size = UDim2.new(1, 0, 0, 28)
-    btn.Font = Enum.Font.GothamSemibold
-    btn.Text = "Teleport: " .. islandName
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 10
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
-    corner.Parent = btn
-    
-    btn.MouseButton1Click:Connect(function()
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = cf
-            sendNotification("Teleported to " .. islandName, Color3.fromRGB(0, 255, 150))
-        else
-            sendNotification("Character not loaded!", Color3.fromRGB(255, 100, 100))
-        end
-    end)
 end
 
 MinimizeButton.MouseButton1Click:Connect(function()
@@ -335,7 +260,7 @@ task.spawn(function()
     end
 end)
 
--- ROBUST SERVER HOPPER (FIXED ENDPOINT & RETRY FLOW)
+-- BULLETPROOF SERVER HOPPER (FILTERS PRIVATE, FULL, & VIP SERVERS)
 local isHopping = false 
 
 local function getBlacklist()
@@ -371,14 +296,14 @@ local function hopServer()
     isHopping = true 
     
     StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
-    StatusLabel.Text = "Status: Finding clean server..."
+    StatusLabel.Text = "Status: Filtering clean servers..."
     sendNotification("Scanning public API...", Color3.fromRGB(255, 165, 0))
     
     local success, err = pcall(function()
         local validServers = {}
         local cursor = ""
         
-        for i = 1, 3 do
+        for i = 1, 4 do
             local url = "https://games.roproxy.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
             local response = game:HttpGet(url)
             local data = HttpService:JSONDecode(response)
@@ -386,8 +311,10 @@ local function hopServer()
             if data and data.data then
                 for _, s in pairs(data.data) do
                     if type(s) == "table" and s.id and s.playing and s.maxPlayers then
-                        if s.id ~= game.JobId and not serverBlacklist[s.id] then
-                            if s.playing >= 3 and s.playing < s.maxPlayers then
+                        -- Strict checks to avoid VIP, restricted, full, or dead servers
+                        local isPrivateOrRestricted = s.private or s.showPrivateContent == true
+                        if not isPrivateOrRestricted and s.id ~= game.JobId and not serverBlacklist[s.id] then
+                            if s.playing >= 3 and s.playing <= (s.maxPlayers - 2) then
                                 table.insert(validServers, s.id)
                             end
                         end
@@ -408,10 +335,10 @@ local function hopServer()
             serverBlacklist[targetId] = os.time()
             saveBlacklist(serverBlacklist)
             
-            StatusLabel.Text = "Status: Teleporting..."
+            StatusLabel.Text = "Status: Teleporting to public server..."
             TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, LocalPlayer)
         else
-            -- If no servers found with filters, fallback to standard Roblox public queue
+            -- Safe public queue fallback using standard Roblox service instead of random raw IDs
             StatusLabel.Text = "Status: Fallback queue hop..."
             TeleportService:Teleport(game.PlaceId, LocalPlayer)
         end
@@ -432,7 +359,7 @@ TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, erro
     if player == LocalPlayer then
         isHopping = false
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        StatusLabel.Text = "Status: Hop rejected, grabbing new ID..."
+        StatusLabel.Text = "Status: Hop rejected/restricted, retrying..."
         task.wait(1)
         hopServer()
     end
